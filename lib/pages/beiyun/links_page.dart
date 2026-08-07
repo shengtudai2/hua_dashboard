@@ -119,7 +119,7 @@ class _LinksPageState extends State<LinksPage> {
     if (result == null) return;
     setState(() {
       if (isEdit) {
-        existing!['title'] = result['title']!;
+        existing['title'] = result['title']!;
         existing['url'] = result['url']!;
         existing['emoji'] = result['emoji']!;
       } else {
