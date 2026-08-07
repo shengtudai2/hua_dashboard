@@ -180,9 +180,8 @@ class _BeiyunPageState extends State<BeiyunPage>
       planDate: result['planDate'],
       createdAt: DateTime.now().millisecondsSinceEpoch,
     );
-    final id = await AppDatabase.instance.addBeiyunTask(task);
-    task.id = id;
-    setState(() => _tasks.add(task));
+    await AppDatabase.instance.addBeiyunTask(task);
+    _loadAll();
   }
 
   Widget _buildTasksTab() {
@@ -765,9 +764,8 @@ class _BeiyunPageState extends State<BeiyunPage>
       category: result['category'],
       note: result['note'] ?? '',
     );
-    final id = await AppDatabase.instance.addBeiyunFinance(finance);
-    finance.id = id;
-    setState(() => _finances.insert(0, finance));
+    await AppDatabase.instance.addBeiyunFinance(finance);
+    _loadAll();
   }
 
   Future<void> _deleteFinance(BeiyunFinance f) async {
@@ -897,8 +895,6 @@ class _BeiyunPageState extends State<BeiyunPage>
         (l) => l.date == _todayStr && l.type == type);
     if (existing.isNotEmpty) {
       final log = existing.first;
-      log.done = value;
-      // 直接更新数据库
       await AppDatabase.instance.update(
         'supplement_logs',
         {'done': value ? 1 : 0},
@@ -906,16 +902,13 @@ class _BeiyunPageState extends State<BeiyunPage>
         whereArgs: [log.id],
       );
     } else {
-      final log = SupplementLog(
+      await AppDatabase.instance.addSupplementLog(SupplementLog(
         date: _todayStr,
         type: type,
         done: value,
-      );
-      final id = await AppDatabase.instance.addSupplementLog(log);
-      log.id = id;
-      _supplementLogs.add(log);
+      ));
     }
-    setState(() {});
+    _loadAll();
   }
 
   Widget _buildSupplementsTab() {

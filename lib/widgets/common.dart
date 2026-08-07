@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 
 /// 漂浮装饰粒子层（氛围包的一部分）
@@ -203,7 +202,6 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Theme.of(context).colorScheme;
     final card = color ?? Theme.of(context).cardColor;
     return Material(
       color: card,
@@ -244,7 +242,6 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,

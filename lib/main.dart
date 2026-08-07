@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'theme/app_theme.dart';
 import 'database/database_helper.dart';
 import 'pages/home/home_page.dart';
@@ -22,15 +21,12 @@ void main() async {
   final collectionId = prefs.getString('theme_collection') ?? 'DOPAMINE';
   final fontStyle = prefs.getString('font_style') ?? 'rounded';
 
-  var preset = _findPreset(themeId, collectionId);
-  if (preset == null) {
-    preset = DopaminePresets.list[0];
-  }
+  final end = _findPreset(themeId, collectionId) ?? DopaminePresets.list[0];
 
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(
-        preset: preset,
+        preset: end,
         collectionId: collectionId,
         fontStyle: fontStyle,
         prefs: prefs,
@@ -74,7 +70,7 @@ class ThemeProvider extends ChangeNotifier {
 
   String _findCollection(ThemePreset p) {
     for (final entry in AppTheme.collections.entries) {
-      if (entry.any((e) => e.id == p.id)) return entry.key;
+      if (entry.value.any((e) => e.id == p.id)) return entry.key;
     }
     return 'DOPAMINE';
   }

@@ -8,7 +8,6 @@ import '../../database/database_helper.dart';
 import '../../models/beiyun_task.dart';
 import '../../models/budget.dart';
 import '../../models/todo.dart';
-import '../../models/beiyun_extra.dart';
 import '../../main.dart';
 
 /// 工作台首页 — 聚合日历 + 三项目入口
@@ -71,12 +70,6 @@ class _HomePageState extends State<HomePage> {
     // 事项：有 date 的任务
     result['todo'] = _todoTasks.where((t) => t.date == ds).toList();
     return result;
-  }
-
-  /// 判断某天是否有事件
-  bool _hasEvent(DateTime day) {
-    final ev = _eventsForDay(day);
-    return ev['beiyun']!.isNotEmpty || ev['budget']!.isNotEmpty || ev['todo']!.isNotEmpty;
   }
 
   @override
@@ -246,7 +239,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDayDetail(ThemePreset p) {
-    final ds = fmtDate(_selectedDay);
     final ev = _eventsForDay(_selectedDay);
     final hasAny = ev['beiyun']!.isNotEmpty || ev['budget']!.isNotEmpty || ev['todo']!.isNotEmpty;
 

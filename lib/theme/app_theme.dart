@@ -22,7 +22,7 @@ class ThemePreset {
   final String fontFamily;
   final String fontStyle; // rounded / modern / serif
 
-  ThemePreset({
+  const ThemePreset({
     required this.id,
     required this.name,
     required this.desc,
@@ -179,7 +179,6 @@ class AppTheme {
         seedColor: p.pri,
         primary: p.pri,
         secondary: p.accent,
-        background: p.bg,
         surface: p.card,
       ),
       fontFamily: _familyFor(p.fontStyle),

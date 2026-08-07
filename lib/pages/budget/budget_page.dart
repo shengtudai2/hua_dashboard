@@ -34,7 +34,7 @@ class _BudgetPageState extends State<BudgetPage> {
   /// 首次进入时默认切到喜庆红系
   void _ensureRedsTheme() {
     final prov = context.read<ThemeProvider>();
-    if (prov.preset.collectionId != 'REDS') {
+    if (prov.collectionId != 'REDS') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) prov.setTheme(RedsPresets.list[0]);
       });
@@ -584,7 +584,7 @@ class _BudgetPageState extends State<BudgetPage> {
 
 extension _CategoryIcon on BudgetRecord {
   String icon() {
-    final c = _iconMap[r.categoryName];
+    final c = _iconMap[categoryName];
     return c ?? '🧾';
   }
 }

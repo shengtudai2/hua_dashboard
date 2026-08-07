@@ -46,11 +46,9 @@ class _SettingsPageState extends State<SettingsPage> {
       final file = File('${dir.path}/hua_todo_backup.json');
       await file.writeAsString(jsonStr);
 
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          text: '华事务数据备份',
-        ),
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: '华事务数据备份',
       );
       setState(() => _exportStatus = '✅ 导出成功');
     } catch (e) {
@@ -142,7 +140,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 _listTile(p, Icons.upload_file, '导出数据 (JSON)', '备份所有数据到文件', _exportJson),
                 const Divider(height: 1),
-                _listTile(p, Icons.download_file, '导入数据', '从备份文件恢复', _importJson),
+                _listTile(p, Icons.file_download, '导入数据', '从备份文件恢复', _importJson),
                 const Divider(height: 1),
                 _listTile(p, Icons.delete_forever, '清空所有数据', '不可恢复，请谨慎操作', _clearAllData,
                     color: Colors.red),
