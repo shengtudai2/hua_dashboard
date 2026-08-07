@@ -270,6 +270,7 @@ class _HomePageState extends State<HomePage> {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 日历头部控制
             Row(
@@ -346,12 +347,10 @@ class _HomePageState extends State<HomePage> {
                 defaultTextStyle: const TextStyle(color: Color(0xFF333333), fontSize: 14),
                 weekendTextStyle: const TextStyle(color: Color(0xFF333333), fontSize: 14),
                 outsideTextStyle: const TextStyle(color: Color(0xFFCCCCCC), fontSize: 14),
-                cellMargin: const EdgeInsets.symmetric(vertical: 4),
+                cellMargin: const EdgeInsets.symmetric(vertical: 2),
                 markerDecoration: const BoxDecoration(color: Colors.transparent),
                 markersMaxCount: 3,
               ),
-              daysOfWeekHeight: 28,
-              rowHeight: 40,
               eventLoader: (day) {
                 final ds = DateFormat('yyyy-MM-dd').format(day);
                 final r = <String>[];
