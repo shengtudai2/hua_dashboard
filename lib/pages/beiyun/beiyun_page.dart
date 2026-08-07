@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -10,6 +11,7 @@ import 'cycle_page.dart';
 import 'supplement_page.dart';
 import 'links_page.dart';
 import 'taboo_page.dart';
+import 'settings_sheets.dart';
 import 'beiyun_logic.dart';
 
 /// 备孕工作台 — 完整还原 Web 版（5 Tab + 子页面）
@@ -379,12 +381,15 @@ class _BeiyunPageState extends State<BeiyunPage> {
                   // 解禁还剩 (pink bg) - 计算最早解禁天数
                   _buildReleaseTag(),
                   const Spacer(),
-                  const Text('查看任务 >',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: orange,
-                        fontWeight: FontWeight.w600,
-                      )),
+                  GestureDetector(
+                    onTap: () => setState(() => _currentTab = 3),
+                    child: const Text('查看任务 >',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: orange,
+                          fontWeight: FontWeight.w600,
+                        )),
+                  ),
                 ],
               ),
             ],
@@ -449,14 +454,34 @@ class _BeiyunPageState extends State<BeiyunPage> {
 
     final showCycle = stage.key != BeiyunStage.pre && stage.key != BeiyunStage.none;
     final stats = <Widget>[
-      Expanded(child: _statCol('$waitingCount', '解禁', waitingCount > 0 ? '待解禁${waitingCount}项' : '已全部解禁', waitingCount > 0 ? redBadge : greenBadge)),
+      Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _currentTab = 3),
+          child: _statCol('$waitingCount', '解禁', waitingCount > 0 ? '待解禁${waitingCount}项' : '已全部解禁', waitingCount > 0 ? redBadge : greenBadge),
+        ),
+      ),
       _divider(),
-      Expanded(child: _statCol('$doneCount/${mustScope.length}', '必做', '完成$rate%', rate >= 80 ? greenBadge : (rate >= 50 ? blueText : redBadge))),
+      Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _currentTab = 3),
+          child: _statCol('$doneCount/${mustScope.length}', '必做', '完成$rate%', rate >= 80 ? greenBadge : (rate >= 50 ? blueText : redBadge)),
+        ),
+      ),
       _divider(),
-      Expanded(child: _statCol(spentStr, '花费', '预算 8k', blueText)),
+      Expanded(
+        child: GestureDetector(
+          onTap: _navigateToFinance,
+          child: _statCol(spentStr, '花费', '预算 8k', blueText),
+        ),
+      ),
       if (showCycle) ...[
         _divider(),
-        Expanded(child: _statCol('$cycleCount', '经期', '周期 ${pred.lenUsed}天', blueText)),
+        Expanded(
+          child: GestureDetector(
+            onTap: _navigateToCycle,
+            child: _statCol('$cycleCount', '经期', '周期 ${pred.lenUsed}天', blueText),
+          ),
+        ),
       ],
     ];
 
@@ -538,19 +563,22 @@ class _BeiyunPageState extends State<BeiyunPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          const Row(
+          Row(
             children: [
-              Text('今日待办',
+              const Text('今日待办',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: textDark)),
-              Spacer(),
-              Text('全部 >',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: orange,
-                      fontWeight: FontWeight.w600)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => setState(() => _currentTab = 3),
+                child: const Text('全部 >',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: orange,
+                        fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -1357,13 +1385,62 @@ class _BeiyunPageState extends State<BeiyunPage> {
     );
   }
 
-  /// 任务详情弹窗（Web 版底部抽屉样式）
+  /// 任务详情弹窗（Web 版底部抽屉样式 — 完整版）
   void _showTaskDetail(BeiyunTask task) {
+    final status = computeTaskStatus(task);
+    final statusLabel = taskStatusLabel(status);
+    final today = todayStr();
+    final stageName = task.stage == 'preparation'
+        ? '备孕前期'
+        : task.stage == 'trying'
+            ? '备孕期'
+            : '怀孕期';
+
+    // 状态说明
+    String statusDesc;
+    switch (status) {
+      case TaskStatus.pending:
+        statusDesc = '待完成 — 尚未开始，请在计划日期前完成此任务。';
+        break;
+      case TaskStatus.doing:
+        statusDesc = '进行中 — 正在治疗周期内，请按时完成治疗。';
+        break;
+      case TaskStatus.waiting:
+        statusDesc = '解禁期 — 治疗已完成，目前处于等待观察期，解禁后可正常备孕。';
+        break;
+      case TaskStatus.done:
+        statusDesc = '已完成 — 该任务已标记为完成，恭喜！';
+        break;
+    }
+
+    // 最晚完成日差异
+    String? planDateStr;
+    Color? planDateColor;
+    if (task.planDate != null && status != TaskStatus.done) {
+      final days = diffDays(today, task.planDate!);
+      if (days > 0) {
+        planDateStr = '最晚完成 剩 $days 天';
+        planDateColor = orange;
+      } else {
+        planDateStr = '已逾期 ${-days} 天';
+        planDateColor = redBadge;
+      }
+    }
+
+    // 释放日期
+    DateTime? releaseDt;
+    if (task.startDate != null) {
+      releaseDt = computeReleaseDate(task);
+    }
+
+    // 排序号
+    final orderStr = task.order != null ? '第 ${task.order} 项' : '未设置';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => Container(
+      builder: (ctx) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1376,9 +1453,11 @@ class _BeiyunPageState extends State<BeiyunPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Drag handle ──
                 Center(
                   child: Container(
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: const Color(0xFFE0E0E0),
                       borderRadius: BorderRadius.circular(2),
@@ -1386,7 +1465,12 @@ class _BeiyunPageState extends State<BeiyunPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // ══════════════════════════════════════════════
+                // 1. Header: title + close
+                // ══════════════════════════════════════════════
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(task.title,
@@ -1395,49 +1479,607 @@ class _BeiyunPageState extends State<BeiyunPage> {
                               fontWeight: FontWeight.w700,
                               color: textDark)),
                     ),
+                    const SizedBox(width: 8),
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => Navigator.pop(ctx),
                       child: Container(
-                        width: 30, height: 30,
+                        width: 30,
+                        height: 30,
                         decoration: BoxDecoration(
                           color: bgColor,
                           borderRadius: BorderRadius.circular(15),
                         ),
-                        child: const Icon(Icons.close, size: 16, color: textGray),
+                        child: const Icon(Icons.close,
+                            size: 16, color: textGray),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                _detailRow('阶段', task.stage == 'preparation' ? '备孕前期' : task.stage == 'trying' ? '备孕期' : '怀孕期'),
-                if (task.planDate != null) _detailRow('最晚日期', task.planDate!),
-                _detailRow('状态', task.done ? '✅ 已完成' : '⏳ 待完成'),
-                if (task.note.isNotEmpty) _detailRow('备注', task.note),
-                const SizedBox(height: 16),
-                SizedBox(
+
+                // ══════════════════════════════════════════════
+                // 2. Status tags row (Wrap)
+                // ══════════════════════════════════════════════
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    // Status pill
+                    _buildTagPill(statusLabel,
+                        status == TaskStatus.done
+                            ? greenBadge
+                            : status == TaskStatus.waiting
+                                ? const Color(0xFFE88A8A)
+                                : status == TaskStatus.doing
+                                    ? blueText
+                                    : orange),
+                    // 置顶 pill
+                    if (task.pinned)
+                      _buildTagPill('置顶', orange),
+                    // 必做 pill (if not opted-out — pinned implies must-do)
+                    if (task.pinned)
+                      _buildTagPill('必做', greenBadge),
+                    // 最晚完成 / 逾期 pill
+                    if (planDateStr != null)
+                      _buildTagPill(planDateStr, planDateColor!),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // ══════════════════════════════════════════════
+                // 3. 状态说明 box
+                // ══════════════════════════════════════════════
+                Container(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      final updated = task.copyWith(done: !task.done);
-                      AppDatabase.instance.updateBeiyunTask(updated).then((_) {
-                        Navigator.pop(context);
-                        _loadData();
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: orange,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: Text(task.done ? '标记为未完成' : '标记为已完成'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        status == TaskStatus.done
+                            ? Icons.check_circle
+                            : status == TaskStatus.waiting
+                                ? Icons.hourglass_empty
+                                : status == TaskStatus.doing
+                                    ? Icons.sync
+                                    : Icons.schedule,
+                        size: 16,
+                        color: status == TaskStatus.done
+                            ? greenBadge
+                            : status == TaskStatus.waiting
+                                ? const Color(0xFFE88A8A)
+                                : status == TaskStatus.doing
+                                    ? blueText
+                                    : orange,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(statusDesc,
+                            style: const TextStyle(
+                                fontSize: 13, color: textGray, height: 1.4)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ══════════════════════════════════════════════
+                // 4. 医疗周期 section
+                // ══════════════════════════════════════════════
+                if (task.startDate != null) ...[
+                  const Text('医疗周期',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  const SizedBox(height: 8),
+                  _detailRow('开始日期', fmtDate(task.startDate)),
+                  if (task.treatmentMonths != null)
+                    _detailRow('治疗月数', '${task.treatmentMonths} 个月'),
+                  if (task.intervalMonths != null)
+                    _detailRow('间隔月数', '${task.intervalMonths} 个月'),
+                  if (releaseDt != null)
+                    _detailRow(
+                        '解禁日期', '${releaseDt.year}年${releaseDt.month}月${releaseDt.day}日'),
+                  const SizedBox(height: 12),
+                ],
+
+                // ══════════════════════════════════════════════
+                // 5. 花费 section
+                // ══════════════════════════════════════════════
+                if (task.price != null || task.insurancePay != null) ...[
+                  const Text('花费',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  const SizedBox(height: 8),
+                  if (task.price != null)
+                    _detailRow('实际花费', '¥${task.price!.toStringAsFixed(0)}'),
+                  if (task.insurancePay != null)
+                    _detailRow('医保统筹',
+                        '¥${task.insurancePay!.toStringAsFixed(0)}'),
+                  if (task.price != null)
+                    _detailRow('预估价格',
+                        '¥${(task.price! - (task.insurancePay ?? 0)).toStringAsFixed(0)}'),
+                  const SizedBox(height: 12),
+                ],
+
+                // ══════════════════════════════════════════════
+                // 6. 所属阶段 + 排序
+                // ══════════════════════════════════════════════
+                const Text('阶段信息',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textDark)),
+                const SizedBox(height: 8),
+                _detailRow('所属阶段', stageName),
+                _detailRow('排序', orderStr),
+                const SizedBox(height: 12),
+
+                // ══════════════════════════════════════════════
+                // 7. 任务说明
+                // ══════════════════════════════════════════════
+                if (task.description != null &&
+                    task.description!.isNotEmpty) ...[
+                  const Text('任务说明',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(task.description!,
+                        style: const TextStyle(
+                            fontSize: 13, color: textDark, height: 1.5)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // ══════════════════════════════════════════════
+                // 8. 推荐地点
+                // ══════════════════════════════════════════════
+                if (task.location != null &&
+                    task.location!.isNotEmpty) ...[
+                  const Text('推荐地点',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on,
+                            size: 16, color: orange),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(task.location!,
+                              style: const TextStyle(
+                                  fontSize: 13, color: textDark)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // ══════════════════════════════════════════════
+                // 9. 深圳/医保贴士
+                // ══════════════════════════════════════════════
+                if (task.shenzhenTip != null &&
+                    task.shenzhenTip!.isNotEmpty) ...[
+                  const Text('深圳·医保贴士',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textDark)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: lightOrange.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: orange.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.lightbulb_outline,
+                            size: 16, color: orange),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(task.shenzhenTip!,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: textDark,
+                                  height: 1.5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ══════════════════════════════════════════════
+                // 10. Footer buttons
+                // ══════════════════════════════════════════════
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    // 删除 (red, left)
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            showDialog(
+                              context: ctx,
+                              builder: (dCtx) => AlertDialog(
+                                title: const Text('确认删除'),
+                                content: Text('确定要删除「${task.title}」吗？'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dCtx),
+                                    child: const Text('取消'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      AppDatabase.instance
+                                          .deleteBeiyunTask(task.id!)
+                                          .then((_) {
+                                        Navigator.pop(dCtx);
+                                        Navigator.pop(ctx);
+                                        _loadData();
+                                      });
+                                    },
+                                    style: TextButton.styleFrom(
+                                        foregroundColor: redBadge),
+                                    child: const Text('删除',
+                                        style: TextStyle(
+                                            fontWeight:
+                                                FontWeight.w600)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: redBadge,
+                            side: const BorderSide(color: redBadge),
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(12)),
+                          ),
+                          child: const Text('删除任务',
+                              style:
+                                  TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // 编辑 (orange, right)
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showEditTaskModal(task);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: orange,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(12)),
+                          ),
+                          child: const Text('编辑任务',
+                              style:
+                                  TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// 编辑任务弹窗
+  void _showEditTaskModal(BeiyunTask task) {
+    final titleCtrl = TextEditingController(text: task.title);
+    String stage = task.stage;
+    DateTime? planDate =
+        task.planDate != null ? parseISO(task.planDate) : null;
+    bool pinned = task.pinned;
+    final descCtrl = TextEditingController(text: task.description ?? '');
+    final locationCtrl = TextEditingController(text: task.location ?? '');
+    final priceCtrl = TextEditingController(
+        text: task.price != null ? task.price.toString() : '');
+    final insuranceCtrl = TextEditingController(
+        text: task.insurancePay != null ? task.insurancePay.toString() : '');
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+                20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0E0E0),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('编辑任务',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: textDark)),
+                  const SizedBox(height: 16),
+                  // 标题
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: InputDecoration(
+                      hintText: '任务名称',
+                      filled: true,
+                      fillColor: bgColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE0E0E0)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Stage picker
+                  Row(
+                    children: [
+                      _stageChip('备孕前期', 'preparation', stage == 'preparation',
+                          (s) => stage = s),
+                      const SizedBox(width: 8),
+                      _stageChip('备孕期', 'trying', stage == 'trying',
+                          (s) => stage = s),
+                      const SizedBox(width: 8),
+                      _stageChip('怀孕期', 'pregnant', stage == 'pregnant',
+                          (s) => stage = s),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 日期选择
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: planDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2035),
+                        );
+                        if (picked != null) planDate = picked;
+                      },
+                      icon: const Icon(Icons.calendar_today, size: 16),
+                      label: Text(
+                          planDate != null
+                              ? '${planDate!.year}-${planDate!.month.toString().padLeft(2, '0')}-${planDate!.day.toString().padLeft(2, '0')}'
+                              : '选择日期'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: textDark,
+                        side: const BorderSide(color: Color(0xFFE0E0E0)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 描述
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: '任务说明',
+                      filled: true,
+                      fillColor: bgColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE0E0E0)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 地点
+                  TextField(
+                    controller: locationCtrl,
+                    decoration: InputDecoration(
+                      hintText: '推荐地点',
+                      filled: true,
+                      fillColor: bgColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE0E0E0)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 价格
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: priceCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: '价格',
+                            filled: true,
+                            fillColor: bgColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFE0E0E0)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: insuranceCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: '医保报销',
+                            filled: true,
+                            fillColor: bgColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFE0E0E0)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 置顶 toggle
+                  Row(
+                    children: [
+                      const Text('置顶',
+                          style: TextStyle(
+                              fontSize: 14, color: textDark)),
+                      const Spacer(),
+                      Switch(
+                        value: pinned,
+                        onChanged: (v) => pinned = v,
+                        activeColor: orange,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Save button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (titleCtrl.text.trim().isEmpty) return;
+                        final updated = BeiyunTask(
+                          id: task.id,
+                          title: titleCtrl.text.trim(),
+                          stage: stage,
+                          planDate: planDate != null
+                              ? '${planDate!.year}-${planDate!.month.toString().padLeft(2, '0')}-${planDate!.day.toString().padLeft(2, '0')}'
+                              : null,
+                          pinned: pinned,
+                          description: descCtrl.text.trim().isNotEmpty
+                              ? descCtrl.text.trim()
+                              : null,
+                          location: locationCtrl.text.trim().isNotEmpty
+                              ? locationCtrl.text.trim()
+                              : null,
+                          price: priceCtrl.text.trim().isNotEmpty
+                              ? double.tryParse(priceCtrl.text.trim())
+                              : null,
+                          insurancePay:
+                              insuranceCtrl.text.trim().isNotEmpty
+                                  ? double.tryParse(
+                                      insuranceCtrl.text.trim())
+                                  : null,
+                          createdAt: task.createdAt,
+                          done: task.done,
+                          fav: task.fav,
+                          note: task.note,
+                          startDate: task.startDate,
+                          treatmentMonths: task.treatmentMonths,
+                          intervalMonths: task.intervalMonths,
+                          treatmentDone: task.treatmentDone,
+                          shenzhenTip: task.shenzhenTip,
+                          order: task.order,
+                        );
+                        AppDatabase.instance
+                            .updateBeiyunTask(updated)
+                            .then((_) {
+                          Navigator.pop(context);
+                          _loadData();
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: orange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('保存'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 小标签 pill
+  Widget _buildTagPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w600)),
     );
   }
 
@@ -1465,6 +2107,11 @@ class _BeiyunPageState extends State<BeiyunPage> {
     final titleCtrl = TextEditingController();
     String stage = 'preparation';
     DateTime? planDate;
+    bool pinned = false;
+    final descCtrl = TextEditingController();
+    final locationCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final insuranceCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -1541,6 +2188,86 @@ class _BeiyunPageState extends State<BeiyunPage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                // 描述
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: '任务说明',
+                    filled: true,
+                    fillColor: bgColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 地点
+                TextField(
+                  controller: locationCtrl,
+                  decoration: InputDecoration(
+                    hintText: '推荐地点',
+                    filled: true,
+                    fillColor: bgColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 价格
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: priceCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: '价格',
+                          filled: true,
+                          fillColor: bgColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: insuranceCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: '医保报销',
+                          filled: true,
+                          fillColor: bgColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // 置顶 toggle
+                Row(
+                  children: [
+                    const Text('置顶',
+                        style: TextStyle(fontSize: 14, color: textDark)),
+                    const Spacer(),
+                    Switch(
+                      value: pinned,
+                      onChanged: (v) => pinned = v,
+                      activeColor: orange,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -1551,6 +2278,11 @@ class _BeiyunPageState extends State<BeiyunPage> {
                         title: titleCtrl.text.trim(),
                         stage: stage,
                         planDate: planDate != null ? '${planDate!.year}-${planDate!.month.toString().padLeft(2, '0')}-${planDate!.day.toString().padLeft(2, '0')}' : null,
+                        pinned: pinned,
+                        description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
+                        location: locationCtrl.text.trim().isNotEmpty ? locationCtrl.text.trim() : null,
+                        price: priceCtrl.text.trim().isNotEmpty ? double.tryParse(priceCtrl.text.trim()) : null,
+                        insurancePay: insuranceCtrl.text.trim().isNotEmpty ? double.tryParse(insuranceCtrl.text.trim()) : null,
                         createdAt: DateTime.now().millisecondsSinceEpoch,
                       );
                       AppDatabase.instance.addBeiyunTask(task).then((_) {
@@ -1606,7 +2338,7 @@ class _BeiyunPageState extends State<BeiyunPage> {
           // ─── 1. 备孕时间卡片 ───
           _buildProfileCard(
             title: '备孕时间',
-            trailing: _buildCardLink('修改设置', onTap: () {}),
+            trailing: _buildCardLink('修改设置', onTap: _showTimeSettingsModal),
             child: Column(
               children: [
                 _buildInfoRow('备孕目标起始日', '未设置'),
@@ -1645,9 +2377,9 @@ class _BeiyunPageState extends State<BeiyunPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildCardLink('主题', onTap: () {}),
+                _buildCardLink('主题', onTap: _showThemeModal),
                 const SizedBox(width: 12),
-                _buildCardLink('字体', onTap: () {}),
+                _buildCardLink('字体', onTap: _showFontModal),
               ],
             ),
             child: Column(
@@ -1684,12 +2416,12 @@ class _BeiyunPageState extends State<BeiyunPage> {
                   runSpacing: 8,
                   alignment: WrapAlignment.start,
                   children: [
-                    _buildDataButton('Excel导出', onTap: () {}),
-                    _buildDataButton('Excel导入', onTap: () {}),
-                    _buildDataButton('JSON导出', onTap: () {}),
-                    _buildDataButton('JSON导入', onTap: () {}),
-                    _buildDataButton('下载模板', onTap: () {}),
-                    _buildDataButton('重置数据', danger: true, onTap: () {}),
+                    _buildDataButton('Excel导出', onTap: () => _showToast('功能开发中')),
+                    _buildDataButton('Excel导入', onTap: () => _showToast('功能开发中')),
+                    _buildDataButton('JSON导出', onTap: () => _showToast('功能开发中')),
+                    _buildDataButton('JSON导入', onTap: () => _showToast('功能开发中')),
+                    _buildDataButton('下载模板', onTap: () => _showToast('功能开发中')),
+                    _buildDataButton('重置数据', danger: true, onTap: _confirmResetData),
                   ],
                 ),
               ],
@@ -1895,6 +2627,119 @@ class _BeiyunPageState extends State<BeiyunPage> {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  //  备孕时间设置 / 主题 / 字体 Bottom Sheets
+  // ═══════════════════════════════════════════════════════════════
+  void _showToast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(color: Colors.white)),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showTimeSettingsModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _TimeSettingsSheet(
+        onSave: (targetDate, pregnantDate) async {
+          final p = await SharedPreferences.getInstance();
+          if (targetDate != null) {
+            await p.setString('beiyun_target_date', targetDate);
+          } else {
+            await p.remove('beiyun_target_date');
+          }
+          if (pregnantDate != null) {
+            await p.setString('beiyun_pregnant_date', pregnantDate);
+          } else {
+            await p.remove('beiyun_pregnant_date');
+          }
+          if (mounted) {
+            setState(() {
+              _targetDate = targetDate;
+              _pregnantDate = pregnantDate;
+            });
+            _showToast('设置已保存');
+          }
+        },
+      ),
+    );
+  }
+
+  void _showThemeModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _ThemeSheet(
+        onSave: (preset, customColor) async {
+          final p = await SharedPreferences.getInstance();
+          await p.setString('beiyun_theme_preset', preset);
+          if (customColor != null) {
+            await p.setString('beiyun_custom_color', customColor);
+          } else {
+            await p.remove('beiyun_custom_color');
+          }
+          if (mounted) {
+            _showToast('主题已切换');
+          }
+        },
+      ),
+    );
+  }
+
+  void _showFontModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _FontSheet(
+        onSave: (preset) async {
+          final p = await SharedPreferences.getInstance();
+          await p.setString('beiyun_font_preset', preset);
+          if (mounted) {
+            _showToast('字体已切换');
+          }
+        },
+      ),
+    );
+  }
+
+  /// 重置数据：先弹确认框，再提示功能开发中
+  void _confirmResetData() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('确认重置数据？',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: const Text('重置后将清空所有备孕数据，且无法恢复。',
+            style: TextStyle(fontSize: 13, color: textGray)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('取消',
+                style: TextStyle(color: textGray)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              _showToast('功能开发中');
+            },
+            child: const Text('确认重置',
+                style: TextStyle(color: redBadge, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  FAB → 快速操作 Bottom Sheet
+  // ═══════════════════════════════════════════════════════════════
   void _showQuickActions() {
     showModalBottomSheet(
       context: context,
@@ -2028,6 +2873,535 @@ class _BeiyunPageState extends State<BeiyunPage> {
             ),
           );
         }),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  备孕时间设置 Bottom Sheet
+// ═══════════════════════════════════════════════════════════════
+class _TimeSettingsSheet extends StatefulWidget {
+  final Future<void> Function(String? targetDate, String? pregnantDate) onSave;
+  const _TimeSettingsSheet({required this.onSave});
+
+  @override
+  State<_TimeSettingsSheet> createState() => _TimeSettingsSheetState();
+}
+
+class _TimeSettingsSheetState extends State<_TimeSettingsSheet> {
+  DateTime? _targetDate;
+  DateTime? _pregnantDate;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final p = await SharedPreferences.getInstance();
+    final targetStr = p.getString('beiyun_target_date');
+    final pregStr = p.getString('beiyun_pregnant_date');
+    if (mounted) {
+      setState(() {
+        _targetDate = targetStr != null ? parseISO(targetStr) : null;
+        _pregnantDate = pregStr != null ? parseISO(pregStr) : null;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: _loading
+          ? const SizedBox(
+              height: 200,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('备孕时间设置',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: textDark)),
+                const SizedBox(height: 20),
+                // Target date picker
+                _buildDateRow('备孕目标起始日', _targetDate, (d) {
+                  setState(() => _targetDate = d);
+                }),
+                const SizedBox(height: 12),
+                // Pregnant date picker
+                _buildDateRow('确认怀孕日期', _pregnantDate, (d) {
+                  setState(() => _pregnantDate = d);
+                }),
+                const SizedBox(height: 16),
+                const Text(
+                  '设置目标日后，系统会自动推算任务最晚完成日、日历事件与阶段状态',
+                  style: TextStyle(fontSize: 12, color: textGray, height: 1.5),
+                ),
+                const SizedBox(height: 20),
+                // Save button
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final targetStr = _targetDate != null
+                          ? '${_targetDate!.year}-${_targetDate!.month.toString().padLeft(2, '0')}-${_targetDate!.day.toString().padLeft(2, '0')}'
+                          : null;
+                      final pregStr = _pregnantDate != null
+                          ? '${_pregnantDate!.year}-${_pregnantDate!.month.toString().padLeft(2, '0')}-${_pregnantDate!.day.toString().padLeft(2, '0')}'
+                          : null;
+                      await widget.onSave(targetStr, pregStr);
+                      if (context.mounted) Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF5A623),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('保存',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildDateRow(String label, DateTime? date, ValueChanged<DateTime?> onChanged) {
+    return Row(
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 14, color: textDark, fontWeight: FontWeight.w500)),
+        const Spacer(),
+        GestureDetector(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: date ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2035),
+              locale: const Locale('zh', 'CN'),
+            );
+            if (picked != null) {
+              onChanged(picked);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              date != null
+                  ? '${date.year}年${date.month}月${date.day}日'
+                  : '点击选择',
+              style: TextStyle(
+                fontSize: 13,
+                color: date != null
+                    ? const Color(0xFF333333)
+                    : const Color(0xFF999999),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        if (date != null)
+          GestureDetector(
+            onTap: () => onChanged(null),
+            child: const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Icon(Icons.close, size: 18, color: Color(0xFF999999)),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  主题切换 Bottom Sheet
+// ═══════════════════════════════════════════════════════════════
+class _ThemeSheet extends StatefulWidget {
+  final Future<void> Function(String preset, String? customColor) onSave;
+  const _ThemeSheet({required this.onSave});
+
+  @override
+  State<_ThemeSheet> createState() => _ThemeSheetState();
+}
+
+class _ThemeSheetState extends State<_ThemeSheet> {
+  final _themes = [
+    ('樱花粉', '0xFFFFF0F5'),
+    ('薄荷绿', '0xFFE8F5E9'),
+    ('天空蓝', '0xFFE3F2FD'),
+    ('暖阳橙', '0xFFFFF3E0'),
+    ('薰衣草', '0xFFF3E5F5'),
+  ];
+
+  String _selectedPreset = '樱花粉';
+  String? _customColor;
+  final _colorCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final p = await SharedPreferences.getInstance();
+    final preset = p.getString('beiyun_theme_preset') ?? '樱花粉';
+    final custom = p.getString('beiyun_custom_color');
+    if (mounted) {
+      setState(() {
+        _selectedPreset = preset;
+        _customColor = custom;
+        _colorCtrl.text = custom ?? '';
+      });
+    }
+  }
+
+  Color _parseColor(String hex) {
+    try {
+      final val = int.parse(hex.replaceFirst('0x', ''));
+      return Color(val);
+    } catch (_) {
+      return const Color(0xFFFFF0F5);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0E0E0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('切换主题',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: textDark)),
+          const SizedBox(height: 20),
+          // Theme grid
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            alignment: WrapAlignment.center,
+            children: _themes.map((t) {
+              final name = t.$1;
+              final hex = t.$2;
+              final selected = _selectedPreset == name;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedPreset = name),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _parseColor(hex),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFFF5A623)
+                              : const Color(0xFFE0E0E0),
+                          width: selected ? 3 : 1,
+                        ),
+                      ),
+                      child: selected
+                          ? const Icon(Icons.check,
+                              size: 24, color: Color(0xFFF5A623))
+                          : null,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: selected
+                              ? const Color(0xFF333333)
+                              : const Color(0xFF999999),
+                          fontWeight:
+                              selected ? FontWeight.w600 : FontWeight.normal,
+                        )),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          // Custom color input
+          Row(
+            children: [
+              const Text('自定义颜色',
+                  style: TextStyle(fontSize: 13, color: textGray)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _colorCtrl,
+                  decoration: InputDecoration(
+                    hintText: '#FFE4E9',
+                    hintStyle: const TextStyle(
+                        fontSize: 12, color: Color(0xFFCCCCCC)),
+                    isDense: true,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFE0E0E0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFE0E0E0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFF5A623)),
+                    ),
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                  onChanged: (v) {
+                    setState(() => _customColor = v.isEmpty ? null : v);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: _customColor != null && _customColor!.isNotEmpty
+                      ? _parseColor(
+                          _customColor!.startsWith('0x') ? _customColor! : '0x${_customColor!.replaceFirst('#', '')}')
+                      : const Color(0xFFFFE4E9),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFE0E0E0)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Save button
+          SizedBox(
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () async {
+                await widget.onSave(_selectedPreset, _customColor);
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF5A623),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('保存',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  字体切换 Bottom Sheet
+// ═══════════════════════════════════════════════════════════════
+class _FontSheet extends StatefulWidget {
+  final Future<void> Function(String preset) onSave;
+  const _FontSheet({required this.onSave});
+
+  @override
+  State<_FontSheet> createState() => _FontSheetState();
+}
+
+class _FontSheetState extends State<_FontSheet> {
+  final _fonts = ['圆润可爱', '正式优雅', '简约现代'];
+  String _selectedPreset = '圆润可爱';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final p = await SharedPreferences.getInstance();
+    final preset = p.getString('beiyun_font_preset') ?? '圆润可爱';
+    if (mounted) {
+      setState(() => _selectedPreset = preset);
+    }
+  }
+
+  IconData _fontIcon(String name) {
+    switch (name) {
+      case '圆润可爱':
+        return Icons.face;
+      case '正式优雅':
+        return Icons.text_fields;
+      case '简约现代':
+        return Icons.auto_awesome;
+      default:
+        return Icons.text_fields;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0E0E0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('切换字体',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: textDark)),
+          const SizedBox(height: 20),
+          // Font grid
+          Wrap(
+            spacing: 20,
+            runSpacing: 20,
+            alignment: WrapAlignment.center,
+            children: _fonts.map((name) {
+              final selected = _selectedPreset == name;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedPreset = name),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFFFF3E0)
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFFF5A623)
+                              : const Color(0xFFE0E0E0),
+                          width: selected ? 2 : 1,
+                        ),
+                      ),
+                      child: Icon(
+                        _fontIcon(name),
+                        size: 28,
+                        color: selected
+                            ? const Color(0xFFF5A623)
+                            : const Color(0xFF999999),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: selected
+                              ? const Color(0xFF333333)
+                              : const Color(0xFF999999),
+                          fontWeight:
+                              selected ? FontWeight.w600 : FontWeight.normal,
+                        )),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+          // Save button
+          SizedBox(
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () async {
+                await widget.onSave(_selectedPreset);
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF5A623),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('保存',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
       ),
     );
   }
