@@ -756,6 +756,7 @@ class _BeiyunPageState extends State<BeiyunPage> {
         eventMap.putIfAbsent(date, () => []).add(e);
       } catch (_) {}
     }
+    final pred = predictCycle(_cycleEvents, null, null);
 
     return Container(
       decoration: BoxDecoration(
@@ -804,6 +805,34 @@ class _BeiyunPageState extends State<BeiyunPage> {
           rowHeight: 40,
           eventLoader: (day) => eventMap[day] ?? [],
           calendarBuilders: CalendarBuilders<CycleEvent>(
+            defaultBuilder: (context, date, _) {
+              final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              final stage = computeStage(_targetDate, _pregnantDate);
+              final isPreg = _pregnantDate != null && _pregnantDate!.isNotEmpty;
+              final ds = dayStatus(dateStr, _tasks, _cycleEvents, pred, stage.key == BeiyunStage.pre ? 'pre' : 'try', isPreg);
+              Color bg;
+              switch (ds.key) {
+                case 'taboo': bg = const Color(0xFFFFE4E9); break; // 浅粉
+                case 'period': bg = const Color(0xFFFFD6E0); break; // 深粉
+                case 'ovulation': bg = const Color(0xFFFFF3E0); break; // 浅橙
+                case 'fertile': bg = const Color(0xFFF0E6FF); break; // 浅紫
+                default: bg = Colors.transparent;
+              }
+              return Container(
+                margin: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Center(
+                  child: Text('${date.day}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: date.month == _focusedDay.month ? textDark : const Color(0xFFCCCCCC),
+                      )),
+                ),
+              );
+            },
             markerBuilder: (context, date, events) {
               if (events.isEmpty) return const SizedBox.shrink();
               return Row(
@@ -832,47 +861,6 @@ class _BeiyunPageState extends State<BeiyunPage> {
                         color: dotColor, shape: BoxShape.circle),
                   );
                 }).toList(),
-              );
-            },
-            defaultBuilder: (context, date, events) {
-              final isPeriod = _cycleEvents.any((e) {
-                try {
-                  final dt = DateTime.parse(e.date);
-                  return isSameDay(dt, date) &&
-                      e.type == CycleEventType.period;
-                } catch (_) {
-                  return false;
-                }
-              });
-              final isToday = isSameDay(date, DateTime.now());
-              final isSelected = isSameDay(date, _selectedDay);
-
-              Color? bgColor;
-              if (isPeriod) {
-                bgColor = pinkBg;
-              } else if (isToday) {
-                bgColor = const Color(0xFFFFF3E0);
-              } else if (isSelected) {
-                bgColor = lightOrange;
-              }
-
-              return Container(
-                alignment: Alignment.center,
-                decoration: bgColor != null
-                    ? BoxDecoration(
-                        color: bgColor,
-                        borderRadius: BorderRadius.circular(6),
-                      )
-                    : null,
-                child: Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    color: textDark,
-                    fontSize: 14,
-                    fontWeight:
-                        isToday ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
               );
             },
           ),
