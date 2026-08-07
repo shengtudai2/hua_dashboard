@@ -10,6 +10,7 @@ import 'cycle_page.dart';
 import 'supplement_page.dart';
 import 'links_page.dart';
 import 'taboo_page.dart';
+import 'beiyun_logic.dart';
 
 /// 备孕工作台 — 完整还原 Web 版（5 Tab + 子页面）
 class BeiyunPage extends StatefulWidget {
@@ -27,6 +28,8 @@ class _BeiyunPageState extends State<BeiyunPage> {
   List<BeiyunTask> _tasks = [];
   List<CycleEvent> _cycleEvents = [];
   List<BeiyunFinance> _finances = [];
+  String? _targetDate; // 备孕目标起始日
+  String? _pregnantDate; // 确认怀孕日期
 
   // ── Calendar state ──
   DateTime _focusedDay = DateTime.now();
@@ -69,11 +72,14 @@ class _BeiyunPageState extends State<BeiyunPage> {
     final tasks = await db.getBeiyunTasks();
     final events = await db.getCycleEvents();
     final finances = await db.getBeiyunFinance();
+    final settings = await db.getSettings();
     if (mounted) {
       setState(() {
         _tasks = tasks;
         _cycleEvents = events;
         _finances = finances;
+        _targetDate = settings['target_date'] as String?;
+        _pregnantDate = settings['pregnant_date'] as String?;
       });
     }
   }
@@ -255,6 +261,22 @@ class _BeiyunPageState extends State<BeiyunPage> {
   }
 
   Widget _buildHeroCard() {
+    final stage = computeStage(_targetDate, _pregnantDate);
+    final countdown = stage.days != null ? '${stage.days}' : (stage.week != null ? '${stage.week}' : '--');
+    final countLabel = stage.key == BeiyunStage.preg ? '已孕周数' : '距目标日(天)';
+    final targetDisplay = _targetDate != null ? '目标日 ${fmtDate(_targetDate)}' : '目标日 未设置';
+    // 计算标签状态
+    String statusLabel = '可备孕';
+    if (stage.key == BeiyunStage.preg) statusLabel = '孕期';
+    for (final t in _tasks) {
+      if (t.done || t.startDate == null) continue;
+      final st = computeTaskStatus(t, todayStr());
+      if (st == TaskStatus.doing || st == TaskStatus.waiting) {
+        statusLabel = '禁忌期';
+        break;
+      }
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -294,44 +316,44 @@ class _BeiyunPageState extends State<BeiyunPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('备孕前期',
-                            style: TextStyle(
+                        Text(stage.name,
+                            style: const TextStyle(
                               fontFamily: 'ZCOOL KuaiLe',
                               fontSize: 22,
                               color: textDark,
                               fontWeight: FontWeight.w700,
                             )),
                         const SizedBox(height: 4),
-                        const Text('孕前 3-6 月',
-                            style: TextStyle(fontSize: 12, color: textGray)),
+                        Text(stage.sub,
+                            style: const TextStyle(fontSize: 12, color: textGray)),
                         const SizedBox(height: 2),
-                        const Text('目标日 2027年6月23日',
-                            style: TextStyle(fontSize: 12, color: textGray)),
+                        Text(targetDisplay,
+                            style: const TextStyle(fontSize: 12, color: textGray)),
                       ],
                     ),
                   ),
                   // Right: big number
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('320',
+                      Text(countdown,
                           style: TextStyle(
                             fontFamily: 'ZCOOL KuaiLe',
                             fontSize: 36,
                             color: orange,
                             fontWeight: FontWeight.w700,
-                          )),
-                      Text('距目标日(天)',
-                          style: TextStyle(fontSize: 11, color: textGray)),
-                    ],
-                  ),
-                ],
-              ),
+                                                      )),
+                                                  Text(countLabel,
+                                                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
               const SizedBox(height: 12),
               // Bottom tags row
               Row(
                 children: [
-                  // 禁忌期 tag (orange dot + text, orange bg)
+                  // 状态 tag (orange dot + text, orange bg)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -339,13 +361,13 @@ class _BeiyunPageState extends State<BeiyunPage> {
                       color: lightOrange,
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.circle, size: 6, color: orange),
-                        SizedBox(width: 4),
-                        Text('禁忌期',
-                            style: TextStyle(
+                        const Icon(Icons.circle, size: 6, color: orange),
+                        const SizedBox(width: 4),
+                        Text(statusLabel,
+                            style: const TextStyle(
                               fontSize: 11,
                               color: orange,
                               fontWeight: FontWeight.w600,
@@ -354,21 +376,8 @@ class _BeiyunPageState extends State<BeiyunPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // 解禁还剩 (pink bg)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: pinkBg,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text('解禁还剩 87 天',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFFE64A4A),
-                          fontWeight: FontWeight.w600,
-                        )),
-                  ),
+                  // 解禁还剩 (pink bg) - 计算最早解禁天数
+                  _buildReleaseTag(),
                   const Spacer(),
                   const Text('查看任务 >',
                       style: TextStyle(
@@ -385,15 +394,71 @@ class _BeiyunPageState extends State<BeiyunPage> {
     );
   }
 
+  /// 计算最早解禁天数标签
+  Widget _buildReleaseTag() {
+    final today = todayStr();
+    int? minDays;
+    for (final t in _tasks) {
+      if (t.done || t.startDate == null) continue;
+      final st = computeTaskStatus(t, today);
+      if (st == TaskStatus.waiting) {
+        final rel = computeReleaseDate(t);
+        if (rel != null) {
+          final days = diffDays(today, '${rel.year}-${rel.month.toString().padLeft(2, '0')}-${rel.day.toString().padLeft(2, '0')}');
+          if (minDays == null || days < minDays) minDays = days;
+        }
+      }
+    }
+    if (minDays == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: pinkBg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text('解禁还剩 $minDays 天',
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFFE64A4A),
+            fontWeight: FontWeight.w600,
+          )),
+    );
+  }
+
   Widget _buildStatsCard() {
-    final totalTasks = _tasks.length;
-    final doneTasks = _tasks.where((t) => t.done).length;
-    final donePercent = totalTasks > 0 ? (doneTasks * 100 / totalTasks).toInt() : 0;
-    final totalSpent =
-        _finances.fold<double>(0, (s, f) => s + f.amount);
-    final spentStr = totalSpent >= 1000
-        ? '${(totalSpent / 1000).toStringAsFixed(1)}k'
-        : totalSpent.toStringAsFixed(0);
+    final today = todayStr();
+    // 解禁：等待解禁的任务数
+    final waitingCount = _tasks.where((t) =>
+        !t.done && t.startDate != null &&
+        computeTaskStatus(t, today) == TaskStatus.waiting).length;
+    // 必做：当前阶段任务完成进度
+    final stage = computeStage(_targetDate, _pregnantDate);
+    final curStage = stage.key == BeiyunStage.pre ? 'preparation'
+        : (stage.key == BeiyunStage.preg ? 'pregnant' : 'trying');
+    final scope = _tasks.where((t) => t.stage == curStage).toList();
+    final mustScope = scope.where((t) => t.pinned).toList();
+    final doneCount = mustScope.where((t) =>
+        computeTaskStatus(t, today) == TaskStatus.done).length;
+    final rate = mustScope.isNotEmpty ? (doneCount * 100 / mustScope.length).round() : 0;
+    // 花费
+    final totalSpent = _finances.fold<double>(0, (s, f) => s + f.amount);
+    final spentStr = moneyK(totalSpent);
+    // 经期（阶段非 pre 时显示）
+    final pred = predictCycle(_cycleEvents, null, null);
+    final cycleCount = _cycleEvents.where((e) => e.type == CycleEventType.period).length;
+
+    final showCycle = stage.key != BeiyunStage.pre && stage.key != BeiyunStage.none;
+    final stats = <Widget>[
+      Expanded(child: _statCol('$waitingCount', '解禁', waitingCount > 0 ? '待解禁${waitingCount}项' : '已全部解禁', waitingCount > 0 ? redBadge : greenBadge)),
+      _divider(),
+      Expanded(child: _statCol('$doneCount/${mustScope.length}', '必做', '完成$rate%', rate >= 80 ? greenBadge : (rate >= 50 ? blueText : redBadge))),
+      _divider(),
+      Expanded(child: _statCol(spentStr, '花费', '预算 8k', blueText)),
+      if (showCycle) ...[
+        _divider(),
+        Expanded(child: _statCol('$cycleCount', '经期', '周期 ${pred.lenUsed}天', blueText)),
+      ],
+    ];
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -408,19 +473,7 @@ class _BeiyunPageState extends State<BeiyunPage> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-              child: _statCol('1', '解禁', '待解禁1项', orange)),
-          _divider(),
-          Expanded(
-              child: _statCol(
-                  '$doneTasks/$totalTasks', '必做', '完成$donePercent%', orange)),
-          _divider(),
-          Expanded(
-              child: _statCol(spentStr, '花费', '预算 8k', blueText)),
-        ],
-      ),
+      child: Row(children: stats),
     );
   }
 

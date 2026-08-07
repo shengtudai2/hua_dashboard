@@ -104,6 +104,12 @@ class AppDatabase {
       )
     ''');
     await db.execute('''
+      CREATE TABLE IF NOT EXISTS beiyun_settings(
+        key TEXT PRIMARY KEY,
+        value TEXT
+      )
+    ''');
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS budget_categories(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -262,4 +268,22 @@ class AppDatabase {
       update('todo_tasks', t.toMap(), where: 'id = ?', whereArgs: [t.id]);
   Future<int> deleteTodoTask(int id) =>
       delete('todo_tasks', where: 'id = ?', whereArgs: [id]);
+
+  // ---------- 备孕设置 ----------
+  Future<Map<String, dynamic>> getSettings() async {
+    final rows = await query('beiyun_settings');
+    final map = <String, dynamic>{};
+    for (final r in rows) {
+      map[r['key'] as String] = r['value'];
+    }
+    return map;
+  }
+
+  Future<void> setSetting(String key, String? value) async {
+    if (value == null || value.isEmpty) {
+      await delete('beiyun_settings', where: 'key = ?', whereArgs: [key]);
+    } else {
+      await insert('beiyun_settings', {'key': key, 'value': value});
+    }
+  }
 }
