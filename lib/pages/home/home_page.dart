@@ -213,27 +213,44 @@ class _HomePageState extends State<HomePage> {
         ),
         eventLoader: (day) {
           final ev = _eventsForDay(day);
-          final markers = <Widget>[];
-          if (ev['beiyun']!.isNotEmpty) {
-            markers.add(Container(
-              width: 6, height: 6,
-              decoration: BoxDecoration(color: p.pri, shape: BoxShape.circle),
-            ));
-          }
-          if (ev['budget']!.isNotEmpty) {
-            markers.add(Container(
-              width: 6, height: 6,
-              decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle),
-            ));
-          }
-          if (ev['todo']!.isNotEmpty) {
-            markers.add(Container(
-              width: 6, height: 6,
-              decoration: BoxDecoration(color: p.priDeep, shape: BoxShape.circle),
-            ));
-          }
+          final markers = <String>[];
+          if (ev['beiyun']!.isNotEmpty) markers.add('beiyun');
+          if (ev['budget']!.isNotEmpty) markers.add('budget');
+          if (ev['todo']!.isNotEmpty) markers.add('todo');
           return markers;
         },
+        calendarBuilders: CalendarBuilders(
+          markerBuilder: (context, date, events) {
+            if (events.isEmpty) return const SizedBox.shrink();
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: events.map((e) {
+                Color dotColor;
+                switch (e as String) {
+                  case 'beiyun':
+                    dotColor = p.pri;
+                    break;
+                  case 'budget':
+                    dotColor = p.accent;
+                    break;
+                  case 'todo':
+                    dotColor = p.priDeep;
+                    break;
+                  default:
+                    dotColor = p.line;
+                }
+                return Container(
+                  width: 6, height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
       ),
     );
   }

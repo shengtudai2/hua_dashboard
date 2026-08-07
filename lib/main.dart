@@ -13,27 +13,90 @@ import 'pages/settings_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  // 预初始化数据库
-  await AppDatabase.instance.database;
-  // 读取主题
-  final prefs = await SharedPreferences.getInstance();
-  final themeId = prefs.getString('theme_id') ?? 'sakura';
-  final collectionId = prefs.getString('theme_collection') ?? 'DOPAMINE';
-  final fontStyle = prefs.getString('font_style') ?? 'rounded';
 
-  final end = _findPreset(themeId, collectionId) ?? DopaminePresets.list[0];
+  // 立即渲染品牌启动页，不阻塞首帧
+  runApp(const Boo4Splash());
 
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(
-        preset: end,
-        collectionId: collectionId,
-        fontStyle: fontStyle,
-        prefs: prefs,
+  // 后台初始化数据库 + 主题
+  try {
+    await AppDatabase.instance.database;
+    final prefs = await SharedPreferences.getInstance();
+    final themeId = prefs.getString('theme_id') ?? 'sakura';
+    final collectionId = prefs.getString('theme_collection') ?? 'DOPAMINE';
+    final fontStyle = prefs.getString('font_style') ?? 'rounded';
+    final end = _findPreset(themeId, collectionId) ?? DopaminePresets.list[0];
+
+    runApp(
+      ChangeNotifierProvider(
+        create: (_) => ThemeProvider(
+          preset: end,
+          collectionId: collectionId,
+          fontStyle: fontStyle,
+          prefs: prefs,
+        ),
+        child: const HuaTodoApp(),
       ),
-      child: const HuaTodoApp(),
-    ),
-  );
+    );
+  } catch (e) {
+    // 初始化失败也能进入主界面，数据懒加载
+    final prefs = await SharedPreferences.getInstance();
+    runApp(
+      ChangeNotifierProvider(
+        create: (_) => ThemeProvider(
+          preset: DopaminePresets.list[0],
+          collectionId: 'DOPAMINE',
+          fontStyle: 'rounded',
+          prefs: prefs,
+        ),
+        child: const HuaTodoApp(),
+      ),
+    );
+  }
+}
+
+/// 品牌启动页（初始化期间显示）
+class Boo4Splash extends StatelessWidget {
+  const Boo4Splash({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF6F0FB),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 88, height: 88,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFC1A6F0), Color(0xFFF6C6E6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: const Center(
+                  child: Text('花', style: TextStyle(fontSize: 44, color: Colors.white, fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text('花笺', style: TextStyle(fontSize: 26, color: Color(0xFF6A1B9A), fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              const Text('备孕 · 备婚 · 事项', style: TextStyle(fontSize: 13, color: Color(0xFF9A8AB0))),
+              const SizedBox(height: 32),
+              const SizedBox(
+                width: 24, height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5, valueColor: AlwaysStoppedAnimation(Color(0xFFB39DDB))),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 ThemePreset? _findPreset(String id, String collection) {
@@ -86,7 +149,7 @@ class HuaTodoApp extends StatelessWidget {
     final p = themeProv.preset;
 
     return MaterialApp(
-      title: '华事务',
+      title: '花笺',
       debugShowCheckedModeBanner: false,
       theme: theme,
       home: FloatingDecorLayer(

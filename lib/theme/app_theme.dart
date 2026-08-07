@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// 主题预设 = 氛围包（配色 + 装饰 + 字体联动），不是单纯换色相
 class ThemePreset {
@@ -246,18 +245,15 @@ class AppTheme {
     }
   }
 
-  /// Google Fonts 方案（离线打包时用 system 字体兜底）
+  /// 打包字体方案（离线可用，不依赖 Google CDN）
   static TextStyle? displayFont(String style, {double size = 20, FontWeight? weight, Color? color}) {
     final family = _familyFor(style);
-    TextStyle t = TextStyle(fontSize: size, fontWeight: weight ?? FontWeight.w600, color: color);
-    switch (family) {
-      case 'ZCOOL KuaiLe':
-        return GoogleFonts.zcoolKuaiLe(textStyle: t);
-      case 'Noto Serif SC':
-        return GoogleFonts.notoSerifSc(textStyle: t);
-      default:
-        return GoogleFonts.baloo2(textStyle: t);
-    }
+    return TextStyle(
+      fontFamily: family,
+      fontSize: size,
+      fontWeight: weight ?? FontWeight.w600,
+      color: color,
+    );
   }
 }
 

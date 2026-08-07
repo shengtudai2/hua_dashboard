@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="华事务"
+        android:label="花笺"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
