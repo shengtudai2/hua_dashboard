@@ -1201,7 +1201,9 @@ class _BeiyunPageState extends State<BeiyunPage> {
       } catch (_) {}
     }
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _showTaskDetail(task),
+      child: Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1309,6 +1311,244 @@ class _BeiyunPageState extends State<BeiyunPage> {
           const Icon(Icons.chevron_right,
               size: 16, color: Color(0xFFCCCCCC)),
         ],
+      ),
+      ),
+    );
+  }
+
+  /// 任务详情弹窗（Web 版底部抽屉样式）
+  void _showTaskDetail(BeiyunTask task) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(task.title,
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: textDark)),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 30, height: 30,
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: const Icon(Icons.close, size: 16, color: textGray),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _detailRow('阶段', task.stage == 'preparation' ? '备孕前期' : task.stage == 'trying' ? '备孕期' : '怀孕期'),
+                if (task.planDate != null) _detailRow('最晚日期', task.planDate!),
+                _detailRow('状态', task.done ? '✅ 已完成' : '⏳ 待完成'),
+                if (task.note.isNotEmpty) _detailRow('备注', task.note),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      final updated = task.copyWith(done: !task.done);
+                      AppDatabase.instance.updateBeiyunTask(updated).then((_) {
+                        Navigator.pop(context);
+                        _loadData();
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(task.done ? '标记为未完成' : '标记为已完成'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(label,
+                style: const TextStyle(fontSize: 13, color: textGray)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(fontSize: 14, color: textDark)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 新增任务弹窗
+  void _showAddTaskModal() {
+    final titleCtrl = TextEditingController();
+    String stage = 'preparation';
+    DateTime? planDate;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('新增任务',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: textDark)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleCtrl,
+                  decoration: InputDecoration(
+                    hintText: '任务名称',
+                    filled: true,
+                    fillColor: bgColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Stage picker
+                Row(
+                  children: [
+                    _stageChip('备孕前期', 'preparation', stage == 'preparation', (s) => stage = s),
+                    const SizedBox(width: 8),
+                    _stageChip('备孕期', 'trying', stage == 'trying', (s) => stage = s),
+                    const SizedBox(width: 8),
+                    _stageChip('怀孕期', 'pregnant', stage == 'pregnant', (s) => stage = s),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
+                      );
+                      if (picked != null) planDate = picked;
+                    },
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(planDate != null ? '${planDate!.year}-${planDate!.month.toString().padLeft(2, '0')}-${planDate!.day.toString().padLeft(2, '0')}' : '选择日期'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: textDark,
+                      side: const BorderSide(color: Color(0xFFE0E0E0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (titleCtrl.text.trim().isEmpty) return;
+                      final task = BeiyunTask(
+                        title: titleCtrl.text.trim(),
+                        stage: stage,
+                        planDate: planDate != null ? '${planDate!.year}-${planDate!.month.toString().padLeft(2, '0')}-${planDate!.day.toString().padLeft(2, '0')}' : null,
+                        createdAt: DateTime.now().millisecondsSinceEpoch,
+                      );
+                      AppDatabase.instance.addBeiyunTask(task).then((_) {
+                        Navigator.pop(context);
+                        _loadData();
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('保存'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stageChip(String label, String value, bool selected, void Function(String) onSelect) {
+    return GestureDetector(
+      onTap: () => onSelect(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? orange : bgColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: selected ? orange : const Color(0xFFE0E0E0)),
+        ),
+        child: Text(label, style: TextStyle(
+          fontSize: 12,
+          color: selected ? Colors.white : textDark,
+          fontWeight: FontWeight.w600,
+        )),
       ),
     );
   }
@@ -1648,12 +1888,12 @@ class _BeiyunPageState extends State<BeiyunPage> {
             Row(
               children: [
                 Expanded(
-                    child: _quickActionBtn(Icons.edit_note, '记一笔')),
+                    child: _quickActionBtn(Icons.edit_note, '记一笔', () { Navigator.pop(context); _navigateToFinance(); })),
                 Expanded(
-                    child: _quickActionBtn(Icons.local_florist, '记经期')),
+                    child: _quickActionBtn(Icons.local_florist, '记经期', () { Navigator.pop(context); _navigateToCycle(); })),
                 Expanded(
                     child: _quickActionBtn(
-                        Icons.check_circle_outline, '新任务')),
+                        Icons.check_circle_outline, '新任务', () { Navigator.pop(context); _showAddTaskModal(); })),
               ],
             ),
             const SizedBox(height: 12),
@@ -1661,9 +1901,9 @@ class _BeiyunPageState extends State<BeiyunPage> {
             Row(
               children: [
                 Expanded(
-                    child: _quickActionBtn(Icons.medication, '营养剂')),
+                    child: _quickActionBtn(Icons.medication, '营养剂', () { Navigator.pop(context); _navigateToSupplement(); })),
                 Expanded(
-                    child: _quickActionBtn(Icons.link, '加收藏')),
+                    child: _quickActionBtn(Icons.link, '加收藏', () { Navigator.pop(context); _navigateToLinks(); })),
                 const Expanded(child: SizedBox.shrink()),
               ],
             ),
@@ -1673,9 +1913,9 @@ class _BeiyunPageState extends State<BeiyunPage> {
     );
   }
 
-  Widget _quickActionBtn(IconData icon, String label) {
+  Widget _quickActionBtn(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () => Navigator.pop(context),
+      onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
