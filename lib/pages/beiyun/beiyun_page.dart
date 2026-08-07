@@ -5,6 +5,11 @@ import '../../database/database_helper.dart';
 import '../../models/beiyun_task.dart';
 import '../../models/beiyun_extra.dart';
 import '../../main.dart';
+import 'finance_page.dart';
+import 'cycle_page.dart';
+import 'supplement_page.dart';
+import 'links_page.dart';
+import 'taboo_page.dart';
 
 /// 备孕工作台 — 完整还原 Web 版（5 Tab + 子页面）
 class BeiyunPage extends StatefulWidget {
@@ -1568,60 +1573,29 @@ class _BeiyunPageState extends State<BeiyunPage> {
     );
   }
 
-  // ── 子页面占位导航（财务） ──
+  // ── 子页面导航（财务） ──
   void _navigateToFinance() {
-    _pushPlaceholderPage('财务记账');
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const FinancePage()));
   }
 
-  // ── 子页面占位导航（周期） ──
+  // ── 子页面导航（周期） ──
   void _navigateToCycle() {
-    _pushPlaceholderPage('周期记录');
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const CyclePage()));
   }
 
-  // ── 子页面占位导航（营养） ──
+  // ── 子页面导航（营养） ──
   void _navigateToSupplement() {
-    _pushPlaceholderPage('营养补充');
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const SupplementPage()));
   }
 
-  // ── 子页面占位导航（收藏） ──
+  // ── 子页面导航（收藏） ──
   void _navigateToLinks() {
-    _pushPlaceholderPage('我的收藏');
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const LinksPage()));
   }
 
-  // ── 子页面占位导航（禁忌） ──
+  // ── 子页面导航（禁忌） ──
   void _navigateToTaboo() {
-    _pushPlaceholderPage('禁忌事项');
-  }
-
-  // ── 通用占位子页面（AppBar + 返回 + "功能开发中"） ──
-  void _pushPlaceholderPage(String title) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: bgColor,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: textDark),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(title,
-                style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: textDark)),
-            centerTitle: false,
-          ),
-          body: Center(
-            child: Text('功能开发中',
-                style: const TextStyle(
-                    fontSize: 14, color: textGray)),
-          ),
-        ),
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const TabooPage()));
   }
 
   // ═══════════════════════════════════════════════════════════════
