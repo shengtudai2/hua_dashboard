@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'theme/app_theme.dart';
 import 'database/database_helper.dart';
+import 'data/default_data.dart';
 import 'pages/home/home_page.dart';
 import 'pages/beiyun/beiyun_page.dart';
 import 'pages/budget/budget_page.dart';
@@ -26,6 +27,7 @@ void main() async {
   // 后台初始化数据库 + 主题
   try {
     await AppDatabase.instance.database;
+    await loadDefaultData();
     final prefs = await SharedPreferences.getInstance();
     final themeId = prefs.getString('theme_id') ?? 'sakura';
     final collectionId = prefs.getString('theme_collection') ?? 'DOPAMINE';

@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/common.dart';
+import '../../main.dart';
 import '../../database/database_helper.dart';
 import '../../models/beiyun_task.dart';
 import '../../models/beiyun_extra.dart';
-import '../../main.dart';
+import '../../widgets/web_widgets.dart';
 
-/// 备孕工作台 — 4 个标签页
+/// 备孕工作台 — Web 版设计系统 4 个标签页
 class BeiyunPage extends StatefulWidget {
   const BeiyunPage({super.key});
 
@@ -23,11 +21,10 @@ class _BeiyunPageState extends State<BeiyunPage>
 
   // ── 任务 ──
   List<BeiyunTask> _tasks = [];
-  final Set<int> _expandedStages = {0};
 
   // ── 周期 ──
-  DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
+  DateTime _selectedDay = DateTime.now();
   CalendarFormat _format = CalendarFormat.month;
   List<CycleEvent> _cycleEvents = [];
 
@@ -35,7 +32,7 @@ class _BeiyunPageState extends State<BeiyunPage>
   List<BeiyunFinance> _finances = [];
 
   // ── 营养 ──
-  final List<String> _supplementTypes = ['叶酸', '钙片', '维生素D', '铁剂', 'DHA'];
+  static const _supplementTypes = ['叶酸', '钙片', '维生素D', '铁剂', 'DHA'];
   List<SupplementLog> _supplementLogs = [];
   String _todayStr = '';
 
@@ -46,7 +43,7 @@ class _BeiyunPageState extends State<BeiyunPage>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
-    _todayStr = todayStr();
+    _todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _loadAll();
   }
 
@@ -72,13 +69,13 @@ class _BeiyunPageState extends State<BeiyunPage>
     }
   }
 
-  // ═══════════════════════════════════════════
-  //  TAB 1: 任务
-  // ═══════════════════════════════════════════
+  String _fmt(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
 
+  // ═══════════════════════════════════════════════
+  //  TAB 1: 任务
+  // ═══════════════════════════════════════════════
   List<BeiyunTask> _tasksForStage(String stage) {
     final filtered = _tasks.where((t) => t.stage == stage).toList();
-    // 排序：置顶优先 > 有 planDate 的优先 > 按 created_at 降序
     filtered.sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
       if (a.planDate != null && b.planDate != null) {
@@ -97,396 +94,288 @@ class _BeiyunPageState extends State<BeiyunPage>
     setState(() {});
   }
 
-  Future<void> _toggleTaskFav(BeiyunTask task) async {
-    task.fav = !task.fav;
-    await AppDatabase.instance.updateBeiyunTask(task);
-    setState(() {});
-  }
-
-  Future<void> _deleteTask(BeiyunTask task) async {
-    if (task.id == null) return;
-    await AppDatabase.instance.deleteBeiyunTask(task.id!);
-    setState(() => _tasks.remove(task));
-  }
-
-  Future<void> _showAddTaskDialog() async {
+  Future<void> _showAddTask() async {
     final titleCtrl = TextEditingController();
-    final dateCtrl = TextEditingController();
     int stageIdx = 0;
+    DateTime pickedDate = DateTime.now();
 
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: const Text('添加任务'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleCtrl,
-                decoration: const InputDecoration(labelText: '任务标题'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                value: stageIdx,
-                decoration: const InputDecoration(labelText: '阶段'),
-                items: _stageLabels
-                    .asMap()
-                    .entries
-                    .map((e) => DropdownMenuItem(
-                          value: e.key,
-                          child: Text(e.value),
-                        ))
-                    .toList(),
-                onChanged: (v) => setD(() => stageIdx = v!),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: dateCtrl,
-                decoration: const InputDecoration(
-                  labelText: '计划日期 (可选)',
-                  hintText: 'yyyy-MM-dd',
+    await WebBottomSheet.show<void>(
+      context,
+      title: '添加备孕任务',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          WebFormField(
+            label: '任务标题',
+            required: true,
+            child: WebInput(controller: titleCtrl, hint: '例如：补充叶酸'),
+          ),
+          WebFormField(
+            label: '阶段',
+            child: Wrap(
+              spacing: 8,
+              children: List.generate(_stageLabels.length, (i) {
+                final active = stageIdx == i;
+                return GestureDetector(
+                  onTap: () => setState(() => stageIdx = i),
+                  child: WebChip(label: _stageLabels[i], active: active),
+                );
+              }),
+            ),
+          ),
+          WebFormField(
+            label: '计划日期',
+            child: GestureDetector(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: pickedDate,
+                  firstDate: DateTime(2024),
+                  lastDate: DateTime(2030),
+                );
+                if (d != null) pickedDate = d;
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                decoration: BoxDecoration(
+                  color: WebTheme.card,
+                  border: Border.all(color: WebTheme.line, width: 1.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16, color: WebTheme.ink2),
+                    const SizedBox(width: 8),
+                    Text(
+                      _fmt(pickedDate),
+                      style: const TextStyle(fontSize: 14, color: WebTheme.ink),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (titleCtrl.text.trim().isEmpty) return;
-                Navigator.pop(ctx, {
-                  'title': titleCtrl.text.trim(),
-                  'stage': _stageKeys[stageIdx],
-                  'planDate': dateCtrl.text.trim().isEmpty
-                      ? null
-                      : dateCtrl.text.trim(),
-                });
-              },
-              child: const Text('添加'),
-            ),
-          ],
-        ),
+        ],
       ),
+      actions: [
+        Expanded(
+          child: WebGradientButton(
+            label: '取消',
+            ghost: true,
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: WebGradientButton(
+            label: '添加',
+            icon: Icons.add,
+            onPressed: () async {
+              if (titleCtrl.text.trim().isEmpty) return;
+              final task = BeiyunTask(
+                title: titleCtrl.text.trim(),
+                stage: _stageKeys[stageIdx],
+                planDate: _fmt(pickedDate),
+                createdAt: DateTime.now().millisecondsSinceEpoch,
+              );
+              await AppDatabase.instance.addBeiyunTask(task);
+              await _loadAll();
+              if (mounted) Navigator.pop(context);
+            },
+          ),
+        ),
+      ],
     );
-
-    if (result == null) return;
-    final task = BeiyunTask(
-      title: result['title'],
-      stage: result['stage'],
-      planDate: result['planDate'],
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-    );
-    await AppDatabase.instance.addBeiyunTask(task);
-    _loadAll();
   }
 
   Widget _buildTasksTab() {
-    final p = context.watch<ThemeProvider>().preset;
     final hasTasks = _tasks.isNotEmpty;
-
-    if (!hasTasks) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: EmptyState(icon: '📋', text: '还没有备孕任务，点击 + 添加'),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _showAddTaskDialog,
-          child: const Icon(Icons.add),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-        children: List.generate(_stageKeys.length, (i) {
-          final stage = _stageKeys[i];
-          final stageTasks = _tasksForStage(stage);
-          final isExpanded = _expandedStages.contains(i);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  InkWell(
-                    onTap: () {
-                      setState(() {
-                        if (isExpanded) {
-                          _expandedStages.remove(i);
-                        } else {
-                          _expandedStages.add(i);
-                        }
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isExpanded
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            color: p.ink2,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _stageLabels[i],
-                            style: TextStyle(
-                              color: p.ink,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: p.pri.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${stageTasks.length}',
-                              style: TextStyle(
-                                  color: p.pri, fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (isExpanded && stageTasks.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Text(
-                        '暂无任务',
-                        style: TextStyle(color: p.ink2, fontSize: 13),
-                      ),
-                    ),
-                  if (isExpanded)
-                    ...stageTasks.map((task) => _buildTaskRow(task, p)),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
+      body: hasTasks
+          ? ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+              children: List.generate(_stageKeys.length, (i) {
+                final stage = _stageKeys[i];
+                final stageTasks = _tasksForStage(stage);
+                final done = stageTasks.where((t) => t.done).length;
+                final progress =
+                    stageTasks.isEmpty ? 0.0 : done / stageTasks.length;
+                final badgeColor = switch (i) {
+                  0 => const Color(0xFF4BA886),
+                  1 => WebTheme.pri,
+                  _ => const Color(0xFF9678CF),
+                };
+                final badge = switch (i) {
+                  0 => '前期',
+                  1 => '备孕',
+                  _ => '孕期',
+                };
+                final subtitle = switch (i) {
+                  0 => '孕前3-6个月',
+                  1 => '排卵监测',
+                  _ => '产检孕程',
+                };
+                return WebStageGroup(
+                  badge: badge,
+                  badgeColor: badgeColor,
+                  name: _stageLabels[i],
+                  subtitle: subtitle,
+                  progress: progress,
+                  onAdd: _showAddTask,
+                  child: stageTasks.isEmpty
+                      ? const WebEmptyState(text: '暂无任务，点击 + 添加')
+                      : Column(
+                          children: stageTasks.map((task) {
+                            return WebTaskRow(
+                              title: task.title,
+                              meta: task.planDate != null
+                                  ? '📅 ${task.planDate}'
+                                  : null,
+                              done: task.done,
+                              badge: task.fav ? '★' : null,
+                              badgeColor: Colors.amber,
+                              onTap: () => _toggleTaskDone(task),
+                            );
+                          }).toList(),
+                        ),
+                );
+              }),
+            )
+          : const WebEmptyState(icon: '📋', text: '还没有备孕任务，点击 + 添加'),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddTaskDialog,
+        onPressed: _showAddTask,
+        backgroundColor: WebTheme.pri,
+        foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildTaskRow(BeiyunTask task, ThemePreset p) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onLongPress: () => _deleteTask(task),
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Checkbox(
-                    value: task.done,
-                    onChanged: (_) => _toggleTaskDone(task),
-                    activeColor: p.pri,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title,
-                        style: TextStyle(
-                          color: task.done ? p.ink2 : p.ink,
-                          fontSize: 14,
-                          decoration: task.done
-                              ? TextDecoration.lineThrough
-                              : null,
-                        ),
-                      ),
-                      if (task.planDate != null)
-                        Text(
-                          '📅 ${task.planDate}',
-                          style: TextStyle(
-                              color: p.ink2, fontSize: 11),
-                        ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => _toggleTaskFav(task),
-                  child: Icon(
-                    task.fav ? Icons.star : Icons.star_border,
-                    color: task.fav ? Colors.amber : p.ink2,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════
   //  TAB 2: 周期
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════
+  Color _colorForEvent(CycleEventType type) => switch (type) {
+        CycleEventType.taboo => Colors.red,
+        CycleEventType.period => Colors.pink,
+        CycleEventType.ovulation => Colors.purple,
+        CycleEventType.fertile => Colors.orange,
+        CycleEventType.release => Colors.green,
+        CycleEventType.due => Colors.blue,
+      };
 
-  Color _colorForEvent(CycleEventType type) {
-    switch (type) {
-      case CycleEventType.taboo:
-        return Colors.red;
-      case CycleEventType.period:
-        return Colors.pink;
-      case CycleEventType.ovulation:
-        return Colors.purple;
-      case CycleEventType.fertile:
-        return Colors.orange;
-      case CycleEventType.release:
-        return Colors.green;
-      case CycleEventType.due:
-        return Colors.blue;
-    }
-  }
-
-  String _labelForEventType(CycleEventType type) {
-    switch (type) {
-      case CycleEventType.taboo:
-        return '禁忌';
-      case CycleEventType.period:
-        return '经期';
-      case CycleEventType.ovulation:
-        return '排卵';
-      case CycleEventType.fertile:
-        return '易孕';
-      case CycleEventType.release:
-        return '解禁';
-      case CycleEventType.due:
-        return '到期';
-    }
-  }
+  String _labelForEventType(CycleEventType type) => switch (type) {
+        CycleEventType.taboo => '禁忌',
+        CycleEventType.period => '经期',
+        CycleEventType.ovulation => '排卵',
+        CycleEventType.fertile => '易孕',
+        CycleEventType.release => '解禁',
+        CycleEventType.due => '到期',
+      };
 
   List<CycleEvent> _eventsForDay(DateTime day) {
-    final ds = fmtDate(day);
+    final ds = _fmt(day);
     return _cycleEvents.where((e) => e.date == ds).toList();
   }
 
-  Future<void> _showAddCycleEventDialog() async {
+  Future<void> _showAddCycleEvent() async {
     DateTime pickedDate = _selectedDay;
     CycleEventType pickedType = CycleEventType.period;
     final noteCtrl = TextEditingController();
 
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: const Text('添加周期事件'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
-                onTap: () async {
-                  final d = await showDatePicker(
-                    context: ctx,
-                    initialDate: pickedDate,
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2030),
-                  );
-                  if (d != null) setD(() => pickedDate = d);
-                },
-                child: InputDecorator(
-                  decoration: const InputDecoration(labelText: '日期'),
-                  child: Text(DateFormat('yyyy-MM-dd').format(pickedDate)),
+    await WebBottomSheet.show<void>(
+      context,
+      title: '添加周期事件',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          WebFormField(
+            label: '日期',
+            child: GestureDetector(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: pickedDate,
+                  firstDate: DateTime(2024),
+                  lastDate: DateTime(2030),
+                );
+                if (d != null) setState(() => pickedDate = d);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                decoration: BoxDecoration(
+                  color: WebTheme.card,
+                  border: Border.all(color: WebTheme.line, width: 1.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16, color: WebTheme.ink2),
+                    const SizedBox(width: 8),
+                    Text(
+                      _fmt(pickedDate),
+                      style: const TextStyle(fontSize: 14, color: WebTheme.ink),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<CycleEventType>(
-                value: pickedType,
-                decoration: const InputDecoration(labelText: '类型'),
-                items: CycleEventType.values
-                    .map((t) => DropdownMenuItem(
-                          value: t,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: _colorForEvent(t),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(_labelForEventType(t)),
-                            ],
-                          ),
-                        ))
-                    .toList(),
-                onChanged: (v) => setD(() => pickedType = v!),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteCtrl,
-                decoration: const InputDecoration(labelText: '备注 (可选)'),
-              ),
-            ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
+          WebFormField(
+            label: '类型',
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: CycleEventType.values.map((t) {
+                final active = pickedType == t;
+                return GestureDetector(
+                  onTap: () => setState(() => pickedType = t),
+                  child: WebChip(
+                    label: _labelForEventType(t),
+                    active: active,
+                  ),
+                );
+              }).toList(),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx, {
-                  'date': fmtDate(pickedDate),
-                  'type': pickedType,
-                  'note': noteCtrl.text.trim(),
-                });
-              },
-              child: const Text('添加'),
-            ),
-          ],
-        ),
+          ),
+          WebFormField(
+            label: '备注',
+            child: WebInput(controller: noteCtrl, hint: '可填写备注（可选）'),
+          ),
+        ],
       ),
+      actions: [
+        Expanded(
+          child: WebGradientButton(
+            label: '取消',
+            ghost: true,
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: WebGradientButton(
+            label: '添加',
+            icon: Icons.add,
+            onPressed: () async {
+              final event = CycleEvent(
+                date: _fmt(pickedDate),
+                type: pickedType,
+                note: noteCtrl.text.trim(),
+              );
+              final id = await AppDatabase.instance.addCycleEvent(event);
+              setState(() => _cycleEvents.add(CycleEvent(
+                    id: id,
+                    date: _fmt(pickedDate),
+                    type: pickedType,
+                    note: noteCtrl.text.trim(),
+                  )));
+              if (mounted) Navigator.pop(context);
+            },
+          ),
+        ),
+      ],
     );
-
-    if (result == null) return;
-    final event = CycleEvent(
-      date: result['date'],
-      type: result['type'],
-      note: result['note'] ?? '',
-    );
-    final id = await AppDatabase.instance.addCycleEvent(event);
-    // 赋值 id 以便删除
-    final newEvent = CycleEvent(
-      id: id,
-      date: result['date'],
-      type: result['type'],
-      note: result['note'] ?? '',
-    );
-    setState(() => _cycleEvents.add(newEvent));
   }
 
   Future<void> _deleteCycleEvent(CycleEvent event) async {
@@ -514,20 +403,20 @@ class _BeiyunPageState extends State<BeiyunPage>
   }
 
   Widget _buildCycleTab() {
-    final p = context.watch<ThemeProvider>().preset;
-
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Column(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
         children: [
-          AppCard(
-            padding: const EdgeInsets.all(12),
-            child: TableCalendar(
+          WebCard(
+            padding: const EdgeInsets.all(8),
+            child: TableCalendar<CycleEvent>(
               firstDay: DateTime(2024),
               lastDay: DateTime(2030),
               focusedDay: _focusedDay,
-              selectedDayPredicate: (d) => isSameDay(_selectedDay, d),
+              selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
               calendarFormat: _format,
+              startingDayOfWeek: StartingDayOfWeek.monday,
               onFormatChanged: (f) => setState(() => _format = f),
               onDaySelected: (selected, focused) {
                 setState(() {
@@ -536,236 +425,153 @@ class _BeiyunPageState extends State<BeiyunPage>
                 });
               },
               onPageChanged: (focused) => _focusedDay = focused,
-              locale: 'zh_CN',
-              headerStyle: HeaderStyle(
-                titleCentered: true,
-                formatButtonVisible: false,
-                titleTextStyle: TextStyle(
-                  color: p.ink,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
-                leftChevronIcon: Icon(Icons.chevron_left, color: p.pri),
-                rightChevronIcon: Icon(Icons.chevron_right, color: p.pri),
-              ),
-              calendarStyle: CalendarStyle(
+              eventLoader: (day) => _eventsForDay(day),
+              calendarStyle: const CalendarStyle(
                 todayDecoration: BoxDecoration(
-                  color: p.pri.withValues(alpha: 0.2),
+                  color: WebTheme.priSoft,
                   shape: BoxShape.circle,
                 ),
                 selectedDecoration: BoxDecoration(
-                  color: p.pri,
+                  color: WebTheme.pri,
                   shape: BoxShape.circle,
                 ),
-                selectedTextStyle: const TextStyle(color: Colors.white),
-                defaultTextStyle: TextStyle(color: p.ink),
-                weekendTextStyle:
-                    TextStyle(color: p.ink.withValues(alpha: 0.6)),
-                outsideTextStyle:
-                    TextStyle(color: p.ink2.withValues(alpha: 0.3)),
-                markerDecoration: const BoxDecoration(
-                  color: Colors.transparent,
+                markerDecoration: BoxDecoration(
+                  color: WebTheme.pri,
                   shape: BoxShape.circle,
                 ),
               ),
-              eventLoader: (day) {
-                final dayEvents = _eventsForDay(day);
-                return dayEvents.map((e) {
-                  return Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _colorForEvent(e.type),
-                      shape: BoxShape.circle,
-                    ),
-                  );
-                }).toList();
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  DateFormat('M月d日', 'zh_CN').format(_selectedDay),
-                  style: TextStyle(
-                    color: p.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+              headerStyle: const HeaderStyle(
+                titleCentered: true,
+                formatButtonTextStyle:
+                    TextStyle(color: WebTheme.priDeep, fontSize: 12),
+                formatButtonDecoration: BoxDecoration(
+                  color: WebTheme.bg2,
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  DateFormat('EEEE', 'zh_CN').format(_selectedDay),
-                  style: TextStyle(color: p.ink2, fontSize: 12),
-                ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          Expanded(
-            child: _buildDayEventsList(p),
-          ),
+          ..._eventsForDay(_selectedDay).map((e) {
+            return WebTaskRow(
+              title: _labelForEventType(e.type),
+              meta: e.note.isEmpty ? null : e.note,
+              badge: _fmt(DateTime.parse(e.date)),
+              badgeColor: _colorForEvent(e.type),
+              onTap: () => _deleteCycleEvent(e),
+            );
+          }),
+          if (_eventsForDay(_selectedDay).isEmpty)
+            const WebEmptyState(text: '这一天还没有周期事件，点击 + 添加'),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddCycleEventDialog,
+        onPressed: _showAddCycleEvent,
+        backgroundColor: WebTheme.pri,
+        foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildDayEventsList(ThemePreset p) {
-    final events = _eventsForDay(_selectedDay);
-    if (events.isEmpty) {
-      return EmptyState(icon: '📅', text: '这天没有事件');
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: events.length,
-      itemBuilder: (_, i) {
-        final e = events[i];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: AppCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: InkWell(
-              onTap: () => _deleteCycleEvent(e),
-              borderRadius: BorderRadius.circular(20),
-              child: Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _colorForEvent(e.type),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _labelForEventType(e.type),
-                    style: TextStyle(
-                      color: p.ink,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (e.note.isNotEmpty) ...[
+  // ═══════════════════════════════════════════════
+  //  TAB 3: 财务
+  // ═══════════════════════════════════════════════
+  Future<void> _showAddFinance() async {
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    DateTime pickedDate = DateTime.now();
+    final categoryCtrl = TextEditingController(text: '一般');
+
+    await WebBottomSheet.show<void>(
+      context,
+      title: '添加财务记录',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          WebFormField(
+            label: '金额',
+            required: true,
+            child: WebInput(
+              controller: amountCtrl,
+              hint: '例如：120.50',
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+          ),
+          WebFormField(
+            label: '分类',
+            child: WebInput(controller: categoryCtrl, hint: '例如：检查、药品'),
+          ),
+          WebFormField(
+            label: '日期',
+            child: GestureDetector(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: pickedDate,
+                  firstDate: DateTime(2024),
+                  lastDate: DateTime(2030),
+                );
+                if (d != null) pickedDate = d;
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                decoration: BoxDecoration(
+                  color: WebTheme.card,
+                  border: Border.all(color: WebTheme.line, width: 1.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16, color: WebTheme.ink2),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        e.note,
-                        style: TextStyle(color: p.ink2, fontSize: 13),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Text(
+                      _fmt(pickedDate),
+                      style: const TextStyle(fontSize: 14, color: WebTheme.ink),
                     ),
                   ],
-                  const Spacer(),
-                  Icon(Icons.delete_outline,
-                      size: 18, color: p.ink2.withValues(alpha: 0.5)),
-                ],
+                ),
               ),
             ),
           ),
-        );
-      },
-    );
-  }
-
-  // ═══════════════════════════════════════════
-  //  TAB 3: 财务
-  // ═══════════════════════════════════════════
-
-  double get _totalFinance =>
-      _finances.fold(0.0, (sum, f) => sum + f.amount);
-
-  Future<void> _showAddFinanceDialog() async {
-    DateTime pickedDate = DateTime.now();
-    final amountCtrl = TextEditingController();
-    final categoryCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: const Text('添加财务记录'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
-                onTap: () async {
-                  final d = await showDatePicker(
-                    context: ctx,
-                    initialDate: pickedDate,
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2030),
-                  );
-                  if (d != null) setD(() => pickedDate = d);
-                },
-                child: InputDecorator(
-                  decoration: const InputDecoration(labelText: '日期'),
-                  child: Text(DateFormat('yyyy-MM-dd').format(pickedDate)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '金额'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: categoryCtrl,
-                decoration: const InputDecoration(
-                  labelText: '分类',
-                  hintText: '如：检查、药品、营养品',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteCtrl,
-                decoration: const InputDecoration(labelText: '备注 (可选)'),
-              ),
-            ],
+          WebFormField(
+            label: '备注',
+            child: WebInput(controller: noteCtrl, hint: '可填写备注（可选）'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () {
-                final amount = double.tryParse(amountCtrl.text.trim());
-                if (amount == null || amount <= 0) return;
-                Navigator.pop(ctx, {
-                  'date': fmtDate(pickedDate),
-                  'amount': amount,
-                  'category': categoryCtrl.text.trim().isEmpty
-                      ? '一般'
-                      : categoryCtrl.text.trim(),
-                  'note': noteCtrl.text.trim(),
-                });
-              },
-              child: const Text('添加'),
-            ),
-          ],
-        ),
+        ],
       ),
+      actions: [
+        Expanded(
+          child: WebGradientButton(
+            label: '取消',
+            ghost: true,
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: WebGradientButton(
+            label: '添加',
+            icon: Icons.add,
+            onPressed: () async {
+              final amount = double.tryParse(amountCtrl.text.trim());
+              if (amount == null || amount < 0) return;
+              final rec = BeiyunFinance(
+                amount: amount,
+                date: _fmt(pickedDate),
+                note: noteCtrl.text.trim(),
+                category: categoryCtrl.text.trim().isEmpty
+                    ? '一般'
+                    : categoryCtrl.text.trim(),
+              );
+              await AppDatabase.instance.addBeiyunFinance(rec);
+              await _loadAll();
+              if (mounted) Navigator.pop(context);
+            },
+          ),
+        ),
+      ],
     );
-
-    if (result == null) return;
-    final finance = BeiyunFinance(
-      amount: result['amount'],
-      date: result['date'],
-      category: result['category'],
-      note: result['note'] ?? '',
-    );
-    await AppDatabase.instance.addBeiyunFinance(finance);
-    _loadAll();
   }
 
   Future<void> _deleteFinance(BeiyunFinance f) async {
@@ -775,281 +581,192 @@ class _BeiyunPageState extends State<BeiyunPage>
   }
 
   Widget _buildFinanceTab() {
-    final p = context.watch<ThemeProvider>().preset;
-
+    final total = _finances.fold<double>(0, (s, f) => s + f.amount);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Column(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
         children: [
-          AppCard(
-            child: Row(
+          WebCard(
+            child: Column(
               children: [
-                Text('💰 总支出',
-                    style: TextStyle(color: p.ink2, fontSize: 14)),
-                const Spacer(),
+                const Text('总支出', style: TextStyle(fontSize: 12, color: WebTheme.ink2)),
+                const SizedBox(height: 4),
                 Text(
-                  '¥${fmtMoney(_totalFinance)}',
-                  style: TextStyle(
-                    color: p.pri,
-                    fontSize: 22,
+                  '¥${total.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontFamily: 'ZCOOL KuaiLe',
+                    fontSize: 26,
                     fontWeight: FontWeight.w800,
-                    
+                    color: WebTheme.ink,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _finances.isEmpty
-                ? EmptyState(icon: '💰', text: '还没有财务记录')
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _finances.length,
-                    itemBuilder: (_, i) {
-                      final f = _finances[i];
-                      return Dismissible(
-                        key: ValueKey(f.id ?? i),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade400,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(Icons.delete,
-                              color: Colors.white),
-                        ),
-                        onDismissed: (_) => _deleteFinance(f),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: AppCard(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        f.category,
-                                        style: TextStyle(
-                                          color: p.ink,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${f.date}${f.note.isNotEmpty ? ' · ${f.note}' : ''}',
-                                        style: TextStyle(
-                                          color: p.ink2,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  '¥${fmtMoney(f.amount)}',
-                                  style: TextStyle(
-                                    color: p.pri,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
+          const SizedBox(height: 4),
+          if (_finances.isEmpty)
+            const WebEmptyState(icon: '💰', text: '还没有财务记录，点击 + 添加')
+          else
+            ..._finances.map((f) {
+              return WebTaskRow(
+                title: '¥${f.amount.toStringAsFixed(2)}',
+                meta: f.note.isEmpty ? null : f.note,
+                badge: '${f.category} · ${f.date}',
+                badgeColor: WebTheme.accent,
+                onTap: () => _deleteFinance(f),
+              );
+            }),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddFinanceDialog,
+        onPressed: _showAddFinance,
+        backgroundColor: WebTheme.pri,
+        foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════
   //  TAB 4: 营养
-  // ═══════════════════════════════════════════
-
-  bool _isSupplementDone(String type) {
-    return _supplementLogs
-        .any((l) => l.date == _todayStr && l.type == type && l.done);
+  // ═══════════════════════════════════════════════
+  bool _supplementDone(String type) {
+    final today = _supplementLogs
+        .where((l) => l.date == _todayStr && l.type == type)
+        .toList();
+    if (today.isEmpty) return false;
+    return today.last.done;
   }
 
-  Future<void> _toggleSupplement(String type, bool value) async {
-    // 如果已有记录，更新；否则插入
-    final existing = _supplementLogs.where(
-        (l) => l.date == _todayStr && l.type == type);
-    if (existing.isNotEmpty) {
-      final log = existing.first;
-      await AppDatabase.instance.update(
-        'supplement_logs',
-        {'done': value ? 1 : 0},
-        where: 'id = ?',
-        whereArgs: [log.id],
-      );
-    } else {
-      await AppDatabase.instance.addSupplementLog(SupplementLog(
-        date: _todayStr,
-        type: type,
-        done: value,
-      ));
-    }
-    _loadAll();
+  Future<void> _toggleSupplement(String type, bool done) async {
+    await AppDatabase.instance.addSupplementLog(
+      SupplementLog(date: _todayStr, type: type, done: done),
+    );
+    await _loadAll();
   }
 
-  Widget _buildSupplementsTab() {
-    final p = context.watch<ThemeProvider>().preset;
-
+  Widget _buildNutritionTab() {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              '今日打卡 · $_todayStr',
-              style: TextStyle(
-                color: p.ink2,
-                fontSize: 14,
-              ),
+          WebCard(
+            child: Column(
+              children: [
+                const Text('今日营养打卡', style: TextStyle(
+                  fontFamily: 'ZCOOL KuaiLe',
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w700,
+                  color: WebTheme.ink,
+                )),
+                const SizedBox(height: 4),
+                Text(_todayStr, style: const TextStyle(
+                  fontSize: 11,
+                  color: WebTheme.ink2,
+                )),
+              ],
             ),
           ),
-          Expanded(
-            child: _supplementTypes.isEmpty
-                ? EmptyState(icon: '💊', text: '暂无营养品类')
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _supplementTypes.length,
-                    itemBuilder: (_, i) {
-                      final type = _supplementTypes[i];
-                      final done = _isSupplementDone(type);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: AppCard(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: done
-                                      ? Colors.green.withValues(alpha: 0.15)
-                                      : p.pri.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _supplementIcon(type),
-                                    style: const TextStyle(fontSize: 18),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  type,
-                                  style: TextStyle(
-                                    color: done ? p.ink2 : p.ink,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    decoration: done
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                              Switch(
-                                value: done,
-                                onChanged: (v) => _toggleSupplement(type, v),
-                                activeColor: Colors.green,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+          const SizedBox(height: 4),
+          WebCard(
+            child: Column(
+              children: List.generate(_supplementTypes.length, (i) {
+                final type = _supplementTypes[i];
+                final done = _supplementDone(type);
+                return Column(
+                  children: [
+                    if (i > 0) const Divider(height: 1, color: WebTheme.line),
+                    _buildSupplementRow(type, done),
+                  ],
+                );
+              }),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _supplementIcon(String type) {
-    switch (type) {
-      case '叶酸':
-        return '🌿';
-      case '钙片':
-        return '🦴';
-      case '维生素D':
-        return '☀️';
-      case '铁剂':
-        return '🩸';
-      case 'DHA':
-        return '🧠';
-      default:
-        return '💊';
-    }
-  }
-
-  // ═══════════════════════════════════════════
-  //  BUILD
-  // ═══════════════════════════════════════════
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.watch<ThemeProvider>().preset;
-
-    return Scaffold(
-      backgroundColor: p.bg,
-      appBar: AppBar(
-        leading: const DrawerMenuButton(),
-        title: const Text('备孕工作台'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
+  Widget _buildSupplementRow(String type, bool done) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
-              color: p.card,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: TabBar(
-              controller: _tabCtrl,
-              indicator: BoxDecoration(
-                color: p.pri.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(14),
+              shape: BoxShape.circle,
+              color: done ? WebTheme.accent : WebTheme.card,
+              border: Border.all(
+                color: done ? WebTheme.accent : WebTheme.line,
+                width: 2,
               ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              labelColor: p.pri,
-              unselectedLabelColor: p.ink2,
-              labelStyle: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600),
-              unselectedLabelStyle: const TextStyle(fontSize: 13),
-              tabs: const [
-                Tab(text: '📋 任务'),
-                Tab(text: '📅 周期'),
-                Tab(text: '💰 财务'),
-                Tab(text: '💊 营养'),
-              ],
+            ),
+            child: done
+                ? const Icon(Icons.check, size: 15, color: Colors.white)
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              type,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: done ? WebTheme.ink2 : WebTheme.ink,
+                decoration: done ? TextDecoration.lineThrough : null,
+              ),
             ),
           ),
+          Switch(
+            value: done,
+            activeColor: WebTheme.accent,
+            onChanged: (v) => _toggleSupplement(type, v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  //  主布局
+  // ═══════════════════════════════════════════════
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: WebTheme.bg,
+      appBar: AppBar(
+        backgroundColor: WebTheme.bg,
+        elevation: 0,
+        leading: const DrawerMenuButton(),
+        title: const Text(
+          '备孕工作台',
+          style: TextStyle(
+            fontFamily: 'ZCOOL KuaiLe',
+            fontSize: 20,
+            color: WebTheme.ink,
+          ),
+        ),
+        bottom: TabBar(
+          controller: _tabCtrl,
+          labelColor: WebTheme.priDeep,
+          unselectedLabelColor: WebTheme.ink2,
+          indicatorColor: WebTheme.pri,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(
+            fontFamily: 'ZCOOL KuaiLe',
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+          tabs: const [
+            Tab(text: '任务'),
+            Tab(text: '周期'),
+            Tab(text: '财务'),
+            Tab(text: '营养'),
+          ],
         ),
       ),
       body: TabBarView(
@@ -1058,7 +775,7 @@ class _BeiyunPageState extends State<BeiyunPage>
           _buildTasksTab(),
           _buildCycleTab(),
           _buildFinanceTab(),
-          _buildSupplementsTab(),
+          _buildNutritionTab(),
         ],
       ),
     );
