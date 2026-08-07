@@ -34,11 +34,10 @@ void main() async {
           fontStyle: fontStyle,
           prefs: prefs,
         ),
-        child: const HuaTodoApp(),
+        child: const DaihuaApp(),
       ),
     );
   } catch (e) {
-    // 初始化失败也能进入主界面，数据懒加载
     final prefs = await SharedPreferences.getInstance();
     runApp(
       ChangeNotifierProvider(
@@ -48,13 +47,13 @@ void main() async {
           fontStyle: 'rounded',
           prefs: prefs,
         ),
-        child: const HuaTodoApp(),
+        child: const DaihuaApp(),
       ),
     );
   }
 }
 
-/// 品牌启动页（初始化期间显示）
+/// 品牌启动页
 class Boo4Splash extends StatelessWidget {
   const Boo4Splash({super.key});
 
@@ -79,11 +78,11 @@ class Boo4Splash extends StatelessWidget {
                   borderRadius: BorderRadius.circular(26),
                 ),
                 child: const Center(
-                  child: Text('花', style: TextStyle(fontSize: 44, color: Colors.white, fontWeight: FontWeight.w800)),
+                  child: Text('代', style: TextStyle(fontSize: 44, color: Colors.white, fontWeight: FontWeight.w800)),
                 ),
               ),
               const SizedBox(height: 20),
-              const Text('花笺', style: TextStyle(fontSize: 26, color: Color(0xFF6A1B9A), fontWeight: FontWeight.w700)),
+              const Text('代花时光', style: TextStyle(fontSize: 26, color: Color(0xFF6A1B9A), fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               const Text('备孕 · 备婚 · 事项', style: TextStyle(fontSize: 13, color: Color(0xFF9A8AB0))),
               const SizedBox(height: 32),
@@ -139,8 +138,8 @@ class ThemeProvider extends ChangeNotifier {
   }
 }
 
-class HuaTodoApp extends StatelessWidget {
-  const HuaTodoApp({super.key});
+class DaihuaApp extends StatelessWidget {
+  const DaihuaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +148,7 @@ class HuaTodoApp extends StatelessWidget {
     final p = themeProv.preset;
 
     return MaterialApp(
-      title: '花笺',
+      title: '代花时光',
       debugShowCheckedModeBanner: false,
       theme: theme,
       home: FloatingDecorLayer(
@@ -160,7 +159,10 @@ class HuaTodoApp extends StatelessWidget {
   }
 }
 
-/// 漂浮粒子层（氛围包装饰）
+// ═══════════════════════════════════════════════════════════════
+// 漂浮粒子层
+// ═══════════════════════════════════════════════════════════════
+
 class FloatingDecorLayer extends StatefulWidget {
   final List<String> floaters;
   final Widget child;
@@ -246,7 +248,28 @@ class _FloatingParticle {
   _FloatingParticle({required this.char, required this.x, required this.delay, required this.size, required this.opacity});
 }
 
-/// 主外壳：底部导航 + 4 个 Tab
+// ═══════════════════════════════════════════════════════════════
+// 主外壳：侧边抽屉导航（匹配 Web 版左边缘把手）
+// ═══════════════════════════════════════════════════════════════
+
+/// 全局抽屉 Key，供各页面 AppBar 的汉堡按钮打开抽屉
+final GlobalKey<ScaffoldState> appDrawerKey = GlobalKey<ScaffoldState>();
+
+/// 每个页面 AppBar 的汉堡按钮 → 打开侧边抽屉
+class DrawerMenuButton extends StatelessWidget {
+  const DrawerMenuButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.watch<ThemeProvider>().preset;
+    return IconButton(
+      icon: Icon(Icons.menu, color: p.pri),
+      onPressed: () => appDrawerKey.currentState?.openDrawer(),
+      tooltip: '应用切换',
+    );
+  }
+}
+
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -255,7 +278,7 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _tab = 0;
+  int _currentPage = 0;
 
   final _pages = const [
     HomePage(),
@@ -267,26 +290,234 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.watch<ThemeProvider>().preset;
+    final prov = context.watch<ThemeProvider>();
+    final p = prov.preset;
+
     return Scaffold(
-      body: IndexedStack(index: _tab, children: _pages),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
-        backgroundColor: p.card,
-        selectedItemColor: p.pri,
-        unselectedItemColor: p.ink2,
-        type: BottomNavigationBarType.fixed,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: '工作台'),
-          BottomNavigationBarItem(icon: Icon(Icons.child_care_outlined), activeIcon: Icon(Icons.child_care), label: '备孕'),
-          BottomNavigationBarItem(icon: Icon(Icons.card_giftcard_outlined), activeIcon: Icon(Icons.card_giftcard), label: '备婚'),
-          BottomNavigationBarItem(icon: Icon(Icons.checklist_outlined), activeIcon: Icon(Icons.checklist), label: '事项'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), activeIcon: Icon(Icons.settings), label: '设置'),
-        ],
+      key: appDrawerKey,
+      backgroundColor: p.bg,
+      drawer: _buildDrawer(context, prov, p),
+      body: IndexedStack(index: _currentPage, children: _pages),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context, ThemeProvider prov, ThemePreset p) {
+    return Drawer(
+      backgroundColor: p.card,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // 品牌区
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [p.heroA, p.heroB],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('代花时光', style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'ZCOOL KuaiLe',
+                  )),
+                  const SizedBox(height: 4),
+                  Text('备孕 · 备婚 · 事项', style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                  )),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // 模块列表
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _drawerItem(context, 0, '🏠', '工作台', p),
+                  _divider(p),
+                  _drawerItem(context, 1, '👶', '备孕工作台', p),
+                  _divider(p),
+                  _drawerItem(context, 2, '💍', '备婚预算', p),
+                  _divider(p),
+                  _drawerItem(context, 3, '☑️', '事项管理', p),
+                  _divider(p),
+                  _drawerItem(context, 4, '⚙️', '设置', p),
+                ],
+              ),
+            ),
+            // 底部主题按钮
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showThemePicker(context, prov),
+                  icon: Icon(Icons.palette, size: 18, color: p.pri),
+                  label: Text('切换主题', style: TextStyle(color: p.pri)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: p.line),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _drawerItem(BuildContext context, int index, String emoji, String label, ThemePreset p) {
+    final isSelected = _currentPage == index;
+    return ListTile(
+      leading: Text(emoji, style: const TextStyle(fontSize: 22)),
+      title: Text(label, style: TextStyle(
+        color: isSelected ? p.pri : p.ink,
+        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        fontSize: 15,
+      )),
+      trailing: isSelected
+          ? Container(
+              width: 6, height: 6,
+              decoration: BoxDecoration(color: p.pri, shape: BoxShape.circle),
+            )
+          : null,
+      onTap: () {
+        setState(() => _currentPage = index);
+        Navigator.pop(context);
+      },
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+    );
+  }
+
+  Widget _divider(ThemePreset p) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Divider(height: 1, color: p.line),
+    );
+  }
+
+  void _showThemePicker(BuildContext context, ThemeProvider prov) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: BoxDecoration(
+          color: prov.preset.card,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: _ThemePickerContent(prov: prov),
+      ),
+    );
+  }
+}
+
+class _ThemePickerContent extends StatelessWidget {
+  final ThemeProvider prov;
+  const _ThemePickerContent({required this.prov});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = prov.preset;
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: p.line, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('氛围主题', style: TextStyle(color: p.ink, fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('当前：${p.name}', style: TextStyle(color: p.ink2, fontSize: 13)),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _themeCollection(context, 'DOPAMINE', '多巴胺系'),
+                    const SizedBox(height: 16),
+                    _themeCollection(context, 'REDS', '喜庆红系'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _themeCollection(BuildContext context, String id, String label) {
+    final list = AppTheme.collections[id]!;
+    final p = prov.preset;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: p.ink2, fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final preset in list)
+              GestureDetector(
+                onTap: () {
+                  prov.setTheme(preset);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  width: 90,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: preset.card,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: preset.id == p.id ? preset.pri : preset.line,
+                        width: preset.id == p.id ? 2.5 : 1),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 42, height: 42,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [preset.heroA, preset.heroB]),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(preset.decorChar ?? preset.name[0],
+                              style: const TextStyle(fontSize: 20)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(preset.name,
+                          style: TextStyle(color: preset.ink, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(preset.desc,
+                          style: TextStyle(color: preset.ink2, fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

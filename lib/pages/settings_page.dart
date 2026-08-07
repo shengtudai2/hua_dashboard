@@ -127,6 +127,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
+        leading: const DrawerMenuButton(),
         title: const Text('设置'),
       ),
       body: ListView(

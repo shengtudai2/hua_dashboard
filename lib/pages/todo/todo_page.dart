@@ -114,7 +114,8 @@ class _TodoPageState extends State<TodoPage> with SingleTickerProviderStateMixin
     return Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
-        title: const Text('事项管理'),
+                leading: const DrawerMenuButton(),
+                title: const Text('事项管理'),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: p.pri,

@@ -24,7 +24,7 @@ class BudgetCategory {
   Map<String, dynamic> toMap() => {
         'id': id,
         'name': name,
-        'group': group,
+        'cat_group': group,
         'budget': budget,
         'spent': spent,
         'pinned': pinned ? 1 : 0,
@@ -35,7 +35,7 @@ class BudgetCategory {
   factory BudgetCategory.fromMap(Map<String, dynamic> m) => BudgetCategory(
         id: m['id'],
         name: m['name'] as String,
-        group: m['group'] as String,
+        group: m['cat_group'] as String,
         budget: (m['budget'] ?? 0).toDouble(),
         spent: (m['spent'] ?? 0).toDouble(),
         pinned: (m['pinned'] ?? 0) == 1,

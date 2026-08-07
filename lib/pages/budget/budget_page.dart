@@ -304,6 +304,7 @@ class _BudgetPageState extends State<BudgetPage> {
     return Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
+        leading: const DrawerMenuButton(),
         title: const Text('备婚预算'),
         actions: [
           IconButton(

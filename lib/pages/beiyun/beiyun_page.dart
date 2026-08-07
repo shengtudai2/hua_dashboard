@@ -1020,6 +1020,7 @@ class _BeiyunPageState extends State<BeiyunPage>
     return Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
+        leading: const DrawerMenuButton(),
         title: const Text('备孕工作台'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),

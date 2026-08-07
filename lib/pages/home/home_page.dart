@@ -80,14 +80,8 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
+        leading: const DrawerMenuButton(),
         title: const Text('工作台'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.palette_outlined, color: p.pri),
-            onPressed: () => ThemePickerSheet.show(context, p,
-                onPick: (picked) => prov.setTheme(picked)),
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,

@@ -70,7 +70,7 @@ class AppDatabase {
           CREATE TABLE budget_categories(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            group TEXT NOT NULL,
+            cat_group TEXT NOT NULL,
             budget REAL DEFAULT 0,
             spent REAL DEFAULT 0,
             pinned INTEGER DEFAULT 0,
