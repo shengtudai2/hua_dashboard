@@ -235,14 +235,9 @@ class AppTheme {
   }
 
   static String _familyFor(String style) {
-    switch (style) {
-      case 'rounded':
-        return 'ZCOOL KuaiLe';
-      case 'serif':
-        return 'Noto Serif SC';
-      default:
-        return 'Baloo 2';
-    }
+    // 使用系统默认字体，确保所有设备文字可见
+    // 后续可替换为打包字体（需验证兼容性）
+    return 'sans-serif';
   }
 
   /// 打包字体方案（离线可用，不依赖 Google CDN）

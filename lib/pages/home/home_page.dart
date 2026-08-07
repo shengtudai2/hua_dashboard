@@ -147,7 +147,6 @@ class _HomePageState extends State<HomePage> {
                   color: p.ink,
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
-                  fontFamily: 'Baloo 2',
                 )),
               ],
             ),

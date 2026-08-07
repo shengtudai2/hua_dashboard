@@ -793,7 +793,7 @@ class _BeiyunPageState extends State<BeiyunPage>
                     color: p.pri,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    fontFamily: 'Baloo 2',
+                    
                   ),
                 ),
               ],
@@ -860,7 +860,7 @@ class _BeiyunPageState extends State<BeiyunPage>
                                     color: p.pri,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    fontFamily: 'Baloo 2',
+                                    
                                   ),
                                 ),
                               ],

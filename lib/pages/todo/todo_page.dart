@@ -358,7 +358,7 @@ class _TodoPageState extends State<TodoPage> with SingleTickerProviderStateMixin
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w800, fontFamily: 'Baloo 2')),
+          Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w800)),
           Text(label, style: TextStyle(color: p.ink2, fontSize: 11)),
         ],
       ),

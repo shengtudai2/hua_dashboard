@@ -331,7 +331,7 @@ class _MainShellState extends State<MainShell> {
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
-                    fontFamily: 'ZCOOL KuaiLe',
+                    
                   )),
                   const SizedBox(height: 4),
                   Text('备孕 · 备婚 · 事项', style: TextStyle(
