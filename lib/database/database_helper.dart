@@ -65,7 +65,17 @@ class AppDatabase {
         note TEXT DEFAULT '',
         created_at INTEGER NOT NULL,
         plan_date TEXT,
-        pinned INTEGER DEFAULT 0
+        pinned INTEGER DEFAULT 0,
+        start_date TEXT,
+        treatment_months INTEGER,
+        interval_months INTEGER,
+        treatment_done INTEGER DEFAULT 0,
+        price REAL,
+        insurance_pay REAL,
+        description TEXT,
+        location TEXT,
+        shenzhen_tip TEXT,
+        task_order INTEGER
       )
     ''');
     await db.execute('''
