@@ -1,7 +1,7 @@
 name: hua_todo_apk
 description: "代花时光 — 个人事务管理平台（备孕·备婚·事项）"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.5+5
 
 environment:
   sdk: ^3.6.0
