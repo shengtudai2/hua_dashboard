@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
 import '../../models/beiyun_task.dart';
 import '../../models/beiyun_extra.dart';
+import '../../main.dart';
 
 /// 备孕工作台 — 像素级还原 Web 版
 class BeiyunPage extends StatefulWidget {
@@ -55,6 +56,18 @@ class _BeiyunPageState extends State<BeiyunPage> with SingleTickerProviderStateM
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(
               children: [
+                GestureDetector(
+                  onTap: () => appDrawerKey.currentState?.openDrawer(),
+                  child: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF0F5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.menu, size: 18, color: Color(0xFFCC6600)),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Row(
                   children: [
                     Container(

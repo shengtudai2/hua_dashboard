@@ -5,6 +5,7 @@ import '../../database/database_helper.dart';
 import '../../models/beiyun_task.dart';
 import '../../models/budget.dart';
 import '../../models/todo.dart';
+import '../../main.dart';
 
 /// 工作台首页 — 像素级还原 Web 版
 class HomePage extends StatefulWidget {
@@ -51,7 +52,20 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(
               children: [
-                // 左侧：Logo + 标题
+                // 菜单按钮
+                GestureDetector(
+                  onTap: () => appDrawerKey.currentState?.openDrawer(),
+                  child: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF0F5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.menu, size: 18, color: Color(0xFFD6336C)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Logo + 标题
                 Row(
                   children: [
                     Container(
@@ -106,7 +120,10 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           children: [
             // 纪念日横幅
-            _buildBanner(),
+            GestureDetector(
+              onTap: () => _showBannerDialog(),
+              child: _buildBanner(),
+            ),
             const SizedBox(height: 12),
             // 三功能卡片
             _buildCards(),
@@ -221,24 +238,36 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Row(
                   children: [
-                    _calNavBtn('<'),
+                    GestureDetector(
+                      onTap: () => _changeMonth(-1),
+                      child: _calNavBtn('<'),
+                    ),
                     const SizedBox(width: 8),
-                    const Text('2026 年 8 月', style: TextStyle(
+                    Text('${_focusedDay.year} 年 ${_focusedDay.month} 月', style: const TextStyle(
                       fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF333333),
                     )),
                     const SizedBox(width: 8),
-                    _calNavBtn('>'),
+                    GestureDetector(
+                      onTap: () => _changeMonth(1),
+                      child: _calNavBtn('>'),
+                    ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF8FAB),
-                    borderRadius: BorderRadius.circular(999),
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _focusedDay = DateTime.now();
+                    _selectedDay = DateTime.now();
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF8FAB),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text('今天', style: TextStyle(
+                      fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600,
+                    )),
                   ),
-                  child: const Text('今天', style: TextStyle(
-                    fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600,
-                  )),
                 ),
               ],
             ),
@@ -331,6 +360,29 @@ class _HomePageState extends State<HomePage> {
       child: Center(child: Text(label, style: const TextStyle(
         fontSize: 16, color: Color(0xFFD6336C), fontWeight: FontWeight.w600,
       ))),
+    );
+  }
+
+  void _changeMonth(int delta) {
+    setState(() {
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + delta, _focusedDay.day);
+    });
+  }
+
+  void _showBannerDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('纪念日', style: TextStyle(fontFamily: 'ZCOOL KuaiLe', fontSize: 18)),
+        content: const Text('记录属于你们的纪念日，后续版本将支持日历提醒。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
     );
   }
 
