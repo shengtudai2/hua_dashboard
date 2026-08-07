@@ -1313,73 +1313,313 @@ class _BeiyunPageState extends State<BeiyunPage> {
   // ═══════════════════════════════════════════════════════════════
   Widget _buildProfileTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 30),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 20),
-          // Avatar
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: lightOrange,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Center(
-              child: Text('孕',
-                  style: TextStyle(
-                    fontFamily: 'ZCOOL KuaiLe',
-                    fontSize: 28,
-                    color: orange,
-                    fontWeight: FontWeight.w700,
-                  )),
+          // ─── 1. 备孕时间卡片 ───
+          _buildProfileCard(
+            title: '备孕时间',
+            trailing: _buildCardLink('修改设置', onTap: () {}),
+            child: Column(
+              children: [
+                _buildInfoRow('备孕目标起始日', '未设置'),
+                const SizedBox(height: 10),
+                _buildInfoRow('确认怀孕日期', '未设置'),
+              ],
             ),
           ),
           const SizedBox(height: 12),
-          const Text('准妈妈',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: textDark)),
-          const SizedBox(height: 4),
-          const Text('备孕前期 · 目标 2027年6月',
-              style: TextStyle(fontSize: 12, color: textGray)),
-          const SizedBox(height: 24),
-          _buildProfileMenuItem(Icons.notifications_outlined, '消息通知'),
-          _buildProfileMenuItem(Icons.settings_outlined, '设置'),
-          _buildProfileMenuItem(Icons.help_outline, '帮助与反馈'),
-          _buildProfileMenuItem(Icons.info_outline, '关于'),
+
+          // ─── 2. 功能入口卡片 ───
+          _buildProfileCard(
+            title: '功能入口',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildFeatureEntry(
+                    Icons.account_balance_wallet_outlined, '财务',
+                    onTap: _navigateToFinance),
+                _buildFeatureEntry(Icons.nightlight_outlined, '周期',
+                    onTap: _navigateToCycle),
+                _buildFeatureEntry(Icons.medication_outlined, '营养',
+                    onTap: _navigateToSupplement),
+                _buildFeatureEntry(Icons.link, '收藏',
+                    onTap: _navigateToLinks),
+                _buildFeatureEntry(Icons.block, '禁忌',
+                    onTap: _navigateToTaboo),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ─── 3. 外观设置卡片 ───
+          _buildProfileCard(
+            title: '外观设置',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildCardLink('主题', onTap: () {}),
+                const SizedBox(width: 12),
+                _buildCardLink('字体', onTap: () {}),
+              ],
+            ),
+            child: Column(
+              children: [
+                _buildInfoRow('当前主题', '樱花粉'),
+                const SizedBox(height: 10),
+                _buildInfoRow('当前字体', '圆体'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ─── 4. 数据管理卡片 ───
+          _buildProfileCard(
+            title: '数据管理',
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildDataCount('任务', _tasks.length,
+                        onTap: () {}),
+                    _buildDataCount('财务', _finances.length,
+                        onTap: () {}),
+                    _buildDataCount('经期', _cycleEvents.length,
+                        onTap: () {}),
+                    _buildDataCount('营养', 0, onTap: () {}),
+                    _buildDataCount('收藏', 0, onTap: () {}),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.start,
+                  children: [
+                    _buildDataButton('Excel导出', onTap: () {}),
+                    _buildDataButton('Excel导入', onTap: () {}),
+                    _buildDataButton('JSON导出', onTap: () {}),
+                    _buildDataButton('JSON导入', onTap: () {}),
+                    _buildDataButton('下载模板', onTap: () {}),
+                    _buildDataButton('重置数据', danger: true, onTap: () {}),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ─── 5. 关于卡片 ───
+          _buildProfileCard(
+            title: '关于',
+            child: const Text(
+              '备孕助手是一款专注于科学备孕的轻量工具，帮助您记录备孕目标、'
+              '经期周期、营养摄入与每日任务，陪伴您走好备孕的每一步。',
+              style: TextStyle(fontSize: 13, color: textGray, height: 1.6),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildProfileMenuItem(IconData icon, String label) {
+  // ── 通用卡片容器（白底、圆角、阴影） ──
+  Widget _buildProfileCard({
+    required String title,
+    Widget? trailing,
+    required Widget child,
+  }) {
     return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: textDark),
-          const SizedBox(width: 12),
-          Text(label,
-              style: const TextStyle(fontSize: 14, color: textDark)),
-          const Spacer(),
-          const Icon(Icons.chevron_right,
-              size: 18, color: Color(0xFFCCCCCC)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: textDark)),
+              if (trailing != null) trailing,
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
         ],
+      ),
+    );
+  }
+
+  // ── 卡片右上角链接（如 "修改设置 >"） ──
+  Widget _buildCardLink(String text, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(text,
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: orange,
+                  fontWeight: FontWeight.w500)),
+          const Icon(Icons.chevron_right, size: 16, color: orange),
+        ],
+      ),
+    );
+  }
+
+  // ── 键值信息行 ──
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 13, color: textGray)),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 13, color: textDark, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  // ── 功能入口圆形按钮 ──
+  Widget _buildFeatureEntry(
+    IconData icon,
+    String label, {
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: lightOrange,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 24, color: orange),
+          ),
+          const SizedBox(height: 6),
+          Text(label,
+              style: const TextStyle(fontSize: 12, color: textDark)),
+        ],
+      ),
+    );
+  }
+
+  // ── 数据统计项 ──
+  Widget _buildDataCount(String label, int count, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$count',
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: orange)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(fontSize: 12, color: textGray)),
+        ],
+      ),
+    );
+  }
+
+  // ── 数据管理操作按钮 ──
+  Widget _buildDataButton(String label,
+      {VoidCallback? onTap, bool danger = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: lightOrange,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                color: danger ? redBadge : orange,
+                fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  // ── 子页面占位导航（财务） ──
+  void _navigateToFinance() {
+    _pushPlaceholderPage('财务记账');
+  }
+
+  // ── 子页面占位导航（周期） ──
+  void _navigateToCycle() {
+    _pushPlaceholderPage('周期记录');
+  }
+
+  // ── 子页面占位导航（营养） ──
+  void _navigateToSupplement() {
+    _pushPlaceholderPage('营养补充');
+  }
+
+  // ── 子页面占位导航（收藏） ──
+  void _navigateToLinks() {
+    _pushPlaceholderPage('我的收藏');
+  }
+
+  // ── 子页面占位导航（禁忌） ──
+  void _navigateToTaboo() {
+    _pushPlaceholderPage('禁忌事项');
+  }
+
+  // ── 通用占位子页面（AppBar + 返回 + "功能开发中"） ──
+  void _pushPlaceholderPage(String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: textDark),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(title,
+                style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: textDark)),
+            centerTitle: false,
+          ),
+          body: Center(
+            child: Text('功能开发中',
+                style: const TextStyle(
+                    fontSize: 14, color: textGray)),
+          ),
+        ),
       ),
     );
   }
