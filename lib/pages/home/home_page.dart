@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/database_helper.dart';
 import '../../models/beiyun_task.dart';
 import '../../models/budget.dart';
@@ -19,6 +20,8 @@ class _HomePageState extends State<HomePage> {
   DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
   CalendarFormat _format = CalendarFormat.month;
+  DateTime? _memorialDate;
+  int _daysTogether = 0;
 
   List<BeiyunTask> _tasks = [];
   List<BudgetRecord> _records = [];
@@ -27,7 +30,21 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _loadMemorial();
     _load();
+  }
+
+  Future<void> _loadMemorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dateStr = prefs.getString('memorial_date');
+    if (dateStr != null) {
+      final parts = dateStr.split('-');
+      if (parts.length == 3) {
+        _memorialDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+        _daysTogether = DateTime.now().difference(_memorialDate!).inDays;
+      }
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -137,6 +154,28 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildBanner() {
+    if (_memorialDate != null) {
+      final dateStr = '${_memorialDate!.year}-${_memorialDate!.month.toString().padLeft(2, '0')}-${_memorialDate!.day.toString().padLeft(2, '0')}';
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFFE4E9)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('♡', style: TextStyle(fontSize: 14, color: Color(0xFFFF8FAB))),
+            const SizedBox(width: 6),
+            Text('在一起 $_daysTogether 天 ($dateStr) >', style: const TextStyle(
+              fontSize: 13, color: Color(0xFFCC9999),
+            )),
+          ],
+        ),
+      );
+    }
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -284,7 +323,7 @@ class _HomePageState extends State<HomePage> {
               calendarFormat: _format,
               onFormatChanged: (f) => setState(() => _format = f),
               onDaySelected: (s, f) => setState(() { _selectedDay = s; _focusedDay = f; }),
-              onPageChanged: (f) => _focusedDay = f,
+              onPageChanged: (f) => setState(() => _focusedDay = f),
               locale: 'zh_CN',
               headerVisible: false,
               daysOfWeekStyle: const DaysOfWeekStyle(
@@ -370,20 +409,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showBannerDialog() {
-    showDialog(
+    showDatePicker(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('纪念日', style: TextStyle(fontFamily: 'ZCOOL KuaiLe', fontSize: 18)),
-        content: const Text('记录属于你们的纪念日，后续版本将支持日历提醒。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了'),
-          ),
-        ],
-      ),
-    );
+      initialDate: _memorialDate ?? DateTime.now().subtract(const Duration(days: 365)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      locale: const Locale('zh', 'CN'),
+    ).then((picked) async {
+      if (picked != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('memorial_date', '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}');
+        if (mounted) {
+          setState(() {
+            _memorialDate = picked;
+            _daysTogether = DateTime.now().difference(picked).inDays;
+          });
+        }
+      }
+    });
   }
 
   Widget _buildLegend() {
