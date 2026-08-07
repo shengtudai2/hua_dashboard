@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'theme/app_theme.dart';
 import 'database/database_helper.dart';
 import 'pages/home/home_page.dart';
@@ -13,6 +14,11 @@ import 'pages/settings_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+  // 初始化中文日期符号（否则 TableCalendar/DateFormat 的 zh_CN 会抛异常）
+  try {
+    await initializeDateFormatting('zh_CN', null);
+  } catch (_) {/* 忽略，个别环境可能缺数据 */}
 
   // 立即渲染品牌启动页，不阻塞首帧
   runApp(const Boo4Splash());
